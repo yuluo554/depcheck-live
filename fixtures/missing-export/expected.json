@@ -1,0 +1,77 @@
+{
+  "$schema": "fixtures/expected.schema.md",
+  "case": "C2",
+  "name": "missing-export",
+  "milestone": "M2",
+  "verifies": "MISSING-EXPORT",
+  "source": {
+    "packages": ["chalk@6.0.1", "zod@4.6.7", "date-fns@4.4.0"],
+    "provenance": "data/packages/*.json",
+    "note": "notARealExport 在任何真实包里都不存在；可独立复算：node -e \"import('chalk').then(m=>console.log('notARealExport' in m))\" → false"
+  },
+  "expect": {
+    "exitCode": 1,
+    "summary": {
+      "problems": 4,
+      "gaps": 0
+    }
+  },
+  "points": [
+    {
+      "id": "c2-1",
+      "file": "src/chalk.cjs",
+      "line": 2,
+      "kind": "require",
+      "specifier": "chalk",
+      "imported": ["notARealExport"],
+      "status": "MISSING-EXPORT",
+      "evidence": {
+        "rule": "data/README.md §5 / plan/03 §4.3",
+        "missing": ["notARealExport"],
+        "toFillIn": "M2：入口目标文件 + 导出集清单（证明该名字确实不在其中）"
+      }
+    },
+    {
+      "id": "c2-2",
+      "file": "src/zod.mjs",
+      "line": 2,
+      "kind": "import",
+      "specifier": "zod",
+      "imported": ["notARealExport"],
+      "status": "MISSING-EXPORT",
+      "evidence": {
+        "rule": "data/README.md §5",
+        "missing": ["notARealExport"],
+        "toFillIn": "M2"
+      }
+    },
+    {
+      "id": "c2-3",
+      "file": "src/date-fns.mjs",
+      "line": 2,
+      "kind": "import",
+      "specifier": "date-fns",
+      "imported": ["notARealExport"],
+      "status": "MISSING-EXPORT",
+      "evidence": {
+        "rule": "data/README.md §5",
+        "missing": ["notARealExport"],
+        "toFillIn": "M2"
+      }
+    },
+    {
+      "id": "c2-4-counterexample",
+      "file": "src/chalk.cjs",
+      "line": 3,
+      "kind": "require",
+      "specifier": "chalk",
+      "imported": ["red"],
+      "status": "ESM-CJS-MISMATCH",
+      "whyNotMissingExport": "red 存在于 chalk 的 .default 下，但其 CJS 命名空间上没有 → 判定顺序 §4.4 里 MISMATCH 先于 MISSING-EXPORT",
+      "evidence": {
+        "rule": "data/README.md §5.2 第 4 条 + §5.4.1 实测（require('chalk') 的 keys 不含 red）",
+        "toFillIn": "M2"
+      }
+    }
+  ]
+}

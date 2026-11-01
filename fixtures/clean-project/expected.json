@@ -1,0 +1,133 @@
+{
+  "$schema": "fixtures/expected.schema.md",
+  "case": "C7",
+  "name": "clean-project",
+  "milestone": "M4",
+  "verifies": "零误报（clean bench）",
+  "source": {
+    "packages": ["chalk@6.0.1", "zod@4.6.7", "date-fns@4.4.0", "glob@14.0.3", "commander@15.0.0"],
+    "provenance": "data/packages/*.json + data/README.md §5.4.1",
+    "note": "本 case 反向断言：全部引用合法时必须 0 problems，且 totalPoints > 0（防空跑假绿）"
+  },
+  "expect": {
+    "exitCode": 0,
+    "summary": {
+      "problems": 0,
+      "gaps": 0,
+      "minTotalPoints": 8
+    },
+    "findingRule": "findings 里每条都必须是 RESOLVED；问题数看 summary.problems，不是 findings.length"
+  },
+  "points": [
+    {
+      "id": "c7-1-zod-require",
+      "file": "src/a.cjs",
+      "line": 2,
+      "kind": "require",
+      "specifier": "zod",
+      "imported": ["z"],
+      "status": "RESOLVED",
+      "falsePositiveRisk": "type:module + 有 require 分支 → 只看 type 会误判 MISMATCH",
+      "evidence": { "hasRequireBranch": true, "toFillIn": "M2" }
+    },
+    {
+      "id": "c7-2-date-fns-require",
+      "file": "src/b.cjs",
+      "line": 2,
+      "kind": "require",
+      "specifier": "date-fns",
+      "imported": ["addDays"],
+      "status": "RESOLVED",
+      "falsePositiveRisk": "同上",
+      "evidence": { "hasRequireBranch": true, "toFillIn": "M2" }
+    },
+    {
+      "id": "c7-3-glob-require",
+      "file": "src/c.cjs",
+      "line": 2,
+      "kind": "require",
+      "specifier": "glob",
+      "imported": ["globSync"],
+      "status": "RESOLVED",
+      "falsePositiveRisk": "同上",
+      "evidence": { "hasRequireBranch": true, "toFillIn": "M2" }
+    },
+    {
+      "id": "c7-4-commander-require",
+      "file": "src/d.cjs",
+      "line": 2,
+      "kind": "require",
+      "specifier": "commander",
+      "imported": ["Command"],
+      "status": "RESOLVED",
+      "falsePositiveRisk": "无 require 分支，但符号在命名空间上 → 只看 hasRequireBranch 会误判 MISMATCH",
+      "evidence": { "hasRequireBranch": false, "toFillIn": "M2" }
+    },
+    {
+      "id": "c7-5-chalk-import",
+      "file": "src/e.mjs",
+      "line": 2,
+      "kind": "import",
+      "specifier": "chalk",
+      "imported": ["default"],
+      "status": "RESOLVED",
+      "falsePositiveRisk": "合法 ESM 用法",
+      "evidence": { "toFillIn": "M2" }
+    },
+    {
+      "id": "c7-6-zod-pkgjson",
+      "file": "src/f.cjs",
+      "line": 2,
+      "kind": "require",
+      "specifier": "zod/package.json",
+      "imported": [],
+      "status": "RESOLVED",
+      "falsePositiveRisk": "显式列出的子路径 → 过度应用屏蔽会误判 NOT-EXPORTED-SUBPATH",
+      "evidence": { "exposesPackageJson": true, "toFillIn": "M2" }
+    },
+    {
+      "id": "c7-7-glob-raw",
+      "file": "src/g.cjs",
+      "line": 2,
+      "kind": "require",
+      "specifier": "glob/raw",
+      "imported": [],
+      "status": "RESOLVED",
+      "falsePositiveRisk": "同上",
+      "evidence": { "toFillIn": "M2" }
+    },
+    {
+      "id": "c7-8-relative",
+      "file": "src/h.mjs",
+      "line": 1,
+      "kind": "import",
+      "specifier": "./local.mjs",
+      "imported": ["default"],
+      "status": "OUT-OF-SCOPE",
+      "falsePositiveRisk": "相对路径不是依赖引用，不得计入 problems",
+      "evidence": { "rule": "src/check.mjs 的 outOfScope 分支", "toFillIn": "M2" }
+    },
+    {
+      "id": "c7-9-node-builtin",
+      "file": "src/i.mjs",
+      "line": 1,
+      "kind": "import",
+      "specifier": "node:fs",
+      "imported": ["readFileSync"],
+      "status": "OUT-OF-SCOPE",
+      "falsePositiveRisk": "node: 内置不是依赖引用",
+      "evidence": { "rule": "src/check.mjs 的 outOfScope 分支", "toFillIn": "M2" }
+    },
+    {
+      "id": "c7-10-prose-string",
+      "file": "src/j.mjs",
+      "line": 3,
+      "kind": "string-literal",
+      "specifier": "this is a chalk-like label",
+      "imported": [],
+      "status": "NOT-A-REFERENCE",
+      "falsePositiveRisk": "字符串兜底若不过滤会误判成引用",
+      "evidence": { "rule": "data/README.md §5.3 第 3 条（双条件抑制）", "toFillIn": "M2" }
+    }
+  ]
+}

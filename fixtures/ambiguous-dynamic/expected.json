@@ -1,0 +1,85 @@
+{
+  "$schema": "fixtures/expected.schema.md",
+  "case": "C5",
+  "name": "ambiguous-dynamic",
+  "milestone": "M2",
+  "verifies": "AMBIGUOUS",
+  "source": {
+    "packages": ["chalk@6.0.1", "zod@4.6.7"],
+    "provenance": "本项目合成（plan/04 §6：每种动态形态各一例）",
+    "note": "本项目不执行被测代码（plan/00 §2.1），静态解析不到的一律 AMBIGUOUS"
+  },
+  "expect": {
+    "exitCode": 0,
+    "exitCodeRationale": "data/README.md §5.1 硬纪律：仅存在 AMBIGUOUS、无确证问题时退出码为 0，但报告须显式计数",
+    "summary": {
+      "problems": 0,
+      "gaps": 0,
+      "ambiguous": 5,
+      "minTotalPoints": 6
+    }
+  },
+  "points": [
+    {
+      "id": "c5-1",
+      "file": "src/dyn-var.cjs",
+      "line": 3,
+      "kind": "ambiguous",
+      "specifier": null,
+      "status": "AMBIGUOUS",
+      "form": "变量间接 require",
+      "evidence": { "rule": "plan/03 §3 判据纪律 1（严禁把解析不到当不存在）", "toFillIn": "M2" }
+    },
+    {
+      "id": "c5-2",
+      "file": "src/dyn-concat.cjs",
+      "line": 2,
+      "kind": "ambiguous",
+      "specifier": null,
+      "status": "AMBIGUOUS",
+      "form": "模板字符串拼接",
+      "evidence": { "rule": "plan/03 §3", "toFillIn": "M2" }
+    },
+    {
+      "id": "c5-3",
+      "file": "src/dyn-import.cjs",
+      "line": 3,
+      "kind": "ambiguous",
+      "specifier": null,
+      "status": "AMBIGUOUS",
+      "form": "动态 import 变量",
+      "evidence": { "rule": "plan/03 §3", "toFillIn": "M2" }
+    },
+    {
+      "id": "c5-4",
+      "file": "src/dyn-config.mjs",
+      "line": 4,
+      "kind": "ambiguous",
+      "specifier": null,
+      "status": "AMBIGUOUS",
+      "form": "配置对象里的运行时生成值",
+      "evidence": { "rule": "plan/03 §3", "toFillIn": "M2" }
+    },
+    {
+      "id": "c5-5",
+      "file": "src/dyn-prop.cjs",
+      "line": 2,
+      "kind": "ambiguous",
+      "specifier": null,
+      "status": "AMBIGUOUS",
+      "form": "字面量+变量拼接（防'看到引号就当静态'）",
+      "evidence": { "rule": "plan/03 §3", "toFillIn": "M2" }
+    },
+    {
+      "id": "c5-6-counterexample",
+      "file": "src/static.mjs",
+      "line": 1,
+      "kind": "import",
+      "specifier": "zod",
+      "imported": ["z"],
+      "status": "RESOLVED",
+      "whyCounterexample": "静态字面量必须判 RESOLVED；防'全判 AMBIGUOUS'的实现",
+      "evidence": { "rule": "plan/03 §3", "toFillIn": "M2" }
+    }
+  ]
+}

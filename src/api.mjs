@@ -33,7 +33,7 @@ export function checkAll(root, options = {}) {
   // 补 index（resolve 层结构）到每条记录上，供 check 使用
   for (const record of deps.values()) record.index = indexFor(record, root);
 
-  const scan = scanSources(root, options.scan ?? {});
+  const scan = scanSources(root, { ...(options.scan ?? {}), depNames: new Set(deps.keys()) });
   const findings = [];
   const gaps = [...project.gaps, ...scan.gaps];
 

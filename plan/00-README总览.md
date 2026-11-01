@@ -61,6 +61,10 @@
 | Skill 契约块双向一致 | `SKILL.md` ↔ `src/contract.mjs` | ✅ | `tests/contract.test.mjs` | ⬜ 待 M5 |
 | 裸 clone 可复现 | README 步骤 | ✅ | 手工 + CI（待首推） | ⬜ 待 M6 |
 | 布局门可跑红（10 条判据） | `tools/check-sprint-layout.mjs` | ✅ | `tools/mutate-gates.mjs` | ✅ M0 |
+| `exports` 六形态语义经原文+实测双源核对 | Node 官方 `packages.html` + `esm.html` 解析算法 + 本机实测 | ✅ | `tests/resolve.test.mjs`（每条标注实测编号） | ✅ M1 |
+| 五包 `exports` 指纹可独立复算 | `data/packages/*.json` 的 `canonical` | ✅ | `tests/fingerprints.test.mjs` + `--check` 逐字节 | ✅ M1 |
+| 阈值口径文档↔代码一致 | `data/README` §5.3 ↔ `src/contract.mjs` `LIMITS` | ✅ | `tests/thresholds.test.mjs`（双向） | ✅ M1 |
+| 六份语料骨架含证伪说明 | `fixtures/*/INPUT.md` + `expected.json` | ✅ | `tests/fixtures.test.mjs` | ✅ M1 |
 
 > **本台账状态列必须与里程碑同一次提交里一起翻转。** 其他文档只可引用，不得复制。
 
@@ -69,7 +73,7 @@
 | 里程碑 | 内容 | 状态 |
 |---|---|---|
 | M0 | 计划套件 + 方法论装订 + 可运行骨架（CLI 参数面 + 模块接口 + 两道门） | ✅ 已完成 |
-| M1 | 数据先行：`exports` 六形态语义核对入 `data/README` §5、五包对照组指纹与六份语料定稿 | ⬜ 待 M1 |
+| M1 | 数据先行：`exports` 六形态语义核对入 `data/README` §5、五包对照组指纹与六份语料定稿 | ✅ 已完成 |
 | M2 | 解析层：`exports` 解析器 + 引用点抽取器 + `fixtures/` 骨架 | ⬜ 待 M2 |
 | M3 | 判定层：五个判定态 + `drift`（离线指纹） | ⬜ 待 M3 |
 | M4 | 基准：`bench` / `selftest` / 退出码断言 / 干净零误报集 | ⬜ 待 M4 |

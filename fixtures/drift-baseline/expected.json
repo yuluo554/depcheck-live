@@ -1,0 +1,62 @@
+{
+  "$schema": "fixtures/expected.schema.md",
+  "case": "C6",
+  "name": "drift-baseline",
+  "milestone": "M3",
+  "verifies": ["VERSION-BEHAVIOR-DRIFT", "NO-BASELINE"],
+  "source": {
+    "packages": ["date-fns@4.4.0"],
+    "historicalFingerprints": "用户显式提供的离线包 → data/fingerprints/（M3 落位，M1 不入仓）",
+    "provenance": "data/packages/date-fns.json 为『新版本』一侧真值；旧版本一侧必须由离线包提供，不得伪造",
+    "note": "本文件在 M1 只定义判定形状；具体版本号与 evidence 由 M3 用离线包填充"
+  },
+  "expect": {
+    "exitCodeWhenOnlyNoBaseline": 0,
+    "exitCodeWhenDrift": 1,
+    "summary": {
+      "problemsCountsDrift": true,
+      "noBaselineCountsProblems": false,
+      "noBaselineGoesTo": "gaps"
+    }
+  },
+  "points": [
+    {
+      "id": "c6-1-drift",
+      "file": "src/uses-old-api.mjs",
+      "line": 2,
+      "declaredRange": "^3.0.0",
+      "installedVersion": "4.4.0",
+      "hasOfflineFingerprint": true,
+      "symbolPresentInOld": true,
+      "symbolPresentInInstalled": false,
+      "status": "VERSION-BEHAVIOR-DRIFT",
+      "evidence": { "rule": "plan/03 §5（只在有离线指纹时判定）", "toFillIn": "M3" }
+    },
+    {
+      "id": "c6-2-still-present",
+      "file": "src/uses-stable-api.mjs",
+      "line": 2,
+      "declaredRange": "^3.0.0",
+      "installedVersion": "4.4.0",
+      "hasOfflineFingerprint": true,
+      "symbolPresentInOld": true,
+      "symbolPresentInInstalled": true,
+      "status": "RESOLVED",
+      "whyCounterexample": "防『版本号变大就报漂移』：判据是符号行为，不是 semver 字符串",
+      "evidence": { "rule": "plan/03 §5", "toFillIn": "M3" }
+    },
+    {
+      "id": "c6-3-no-baseline",
+      "file": "src/uses-api-no-history.mjs",
+      "line": 2,
+      "declaredRange": "^3.0.0",
+      "installedVersion": "4.4.0",
+      "hasOfflineFingerprint": false,
+      "status": "NO-BASELINE",
+      "whyHonestyValve": "没有指纹就不许猜；防『看到 range 不匹配就报 DRIFT』",
+      "goesTo": "gaps",
+      "countsAsProblem": false,
+      "evidence": { "rule": "plan/03 §5 + data/README.md §5.1", "toFillIn": "M3" }
+    }
+  ]
+}

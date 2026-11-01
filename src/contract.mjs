@@ -58,6 +58,20 @@ export const SOURCE_EXTENSIONS = Object.freeze([".js", ".cjs", ".mjs", ".ts", ".
 /** 默认跳过的目录名。 */
 export const SKIP_DIRS = Object.freeze(["node_modules", ".git", "dist", "build", "coverage", ".cache"]);
 
+/**
+ * 阈值（**唯一定义见 `data/README.md` §5.3**，此处只做代码侧镜像；两边由
+ * `tests/thresholds.test.mjs` 双向断言——改一处不改另一处会红）。
+ */
+export const LIMITS = Object.freeze({
+  /** `exports` 子路径键数上限；超限整包记 `UNPARSEABLE`（进 gaps），**不得截断静默**。 */
+  EXPORTS_KEYS: 4096,
+  /** 单文件 UTF-8 字节上限；超限降级为字符串兜底扫描并记 `LARGE_FILE_DOWNGRADED`。 */
+  SOURCE_FILE_BYTES: 524288,
+});
+
+/** 降级扫描的 gap 种类（不是"发现问题"，是"覆盖率有折损"，必须显式出现）。 */
+export const LARGE_FILE_DOWNGRADED = "LARGE_FILE_DOWNGRADED";
+
 /** 本工具名（输出与契约块共用一处）。 */
 export const TOOL = "depcheck-live";
 

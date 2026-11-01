@@ -1,0 +1,13 @@
+{
+  "name": "chalk",
+  "version": "6.0.1",
+  "type": "module",
+  "fingerprint": "176c42606af7",
+  "hasRequireBranch": false,
+  "exposesPackageJson": false,
+  "canonical": "{\"default\":\"./source/index.js\",\"types\":\"./source/index.d.ts\"}",
+  "exports": {
+    "types": "./source/index.d.ts",
+    "default": "./source/index.js"
+  }
+}

@@ -9,9 +9,9 @@
 // 行号纪律：必须指向**源行号**。CRLF 先归一成 LF 再切行（否则 Windows 上每行尾部多一个 \r，
 // 且某些正则的 `$` 语义会变），但**归一不改变行数**，所以行号仍然准确。
 
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { KIND, SOURCE_EXTENSIONS, SKIP_DIRS } from "./contract.mjs";
+import { KIND, SOURCE_EXTENSIONS, SKIP_DIRS, LIMITS, LARGE_FILE_DOWNGRADED } from "./contract.mjs";
 
 /**
  * 从单个文件的文本抽取引用点。
@@ -119,6 +119,37 @@ export function parseImportClause(clause) {
   return parts;
 }
 
+/** `⚠️ 字符串兜底`：形似包名的裸字符串（`data/README.md` §5.3 第 3 条）。 */
+const BARE_PACKAGE_NAME = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*(\/[^\s"'`]*)?$/;
+/** 任意引号字符串字面量（单/双/反引号，不含换行，不含插值）。 */
+const ANY_STRING_LITERAL = /(["'`])([^"'`\n$\\]{2,120})\1/g;
+
+/**
+ * 字符串兜底扫描的**误报抑制**（`data/README.md` §5.3 第 3 条：两条同时成立才计入）：
+ *   ① 字符串形似包名（含 `pkg/sub` 形态）；
+ *   ② 其包名部分命中已装依赖名集合。
+ * 只满足 ① 的字符串（文案里的 `"lodash"` 而项目没装 lodash）**不计入**。
+ *
+ * @param {string} text 源文件文本
+ * @param {Set<string>} depNames 已装依赖名（来自 package.json 的 dependencies ∪ devDependencies）
+ * @returns {Array<{specifier:string, line:number}>}
+ */
+export function findBarePackageLiterals(text, depNames) {
+  const out = [];
+  if (!depNames || depNames.size === 0) return out;
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    for (const m of lines[i].matchAll(ANY_STRING_LITERAL)) {
+      const raw = m[2].trim();
+      if (!BARE_PACKAGE_NAME.test(raw)) continue;
+      const namePart = raw.startsWith("@") ? raw.split("/").slice(0, 2).join("/") : raw.split("/")[0];
+      if (!depNames.has(namePart)) continue;
+      out.push({ specifier: raw, line: i + 1 });
+    }
+  }
+  return out;
+}
+
 /**
  * 递归收集源码文件（按扩展名过滤，跳过 `node_modules` 等）。
  * 返回**已排序**的绝对路径列表（确定性：集合遍历前必须排序）。
@@ -151,21 +182,40 @@ function walk(dir, out, exts, skip) {
   }
 }
 
-/** 全树扫描；文件读失败记一条 gap（不静默）。 */
+/** 全树扫描；文件读失败记一条 gap（不静默）；超大文件降级并记一条 gap（也不静默）。 */
 export function scanSources(root, options = {}) {
   const files = collectSourceFiles(root, options);
+  const limit = options.maxFileBytes ?? LIMITS.SOURCE_FILE_BYTES;
   const points = [];
   const gaps = [];
   for (const abs of files) {
     const rel = relative(root, abs).split(sep).join("/");
     let text;
     try {
+      // 单文件上限（`data/README.md` §5.3）：超限**降级为字符串兜底扫描**并显式记账，
+      // 不得静默跳过——用户必须看得见"这份文件没被完整分析"。
+      const size = statSync(abs).size;
+      if (size > limit) {
+        gaps.push({ kind: LARGE_FILE_DOWNGRADED, file: rel, detail: `${size} 字节 > 上限 ${limit}，降级为字符串兜底扫描` });
+      }
       text = readFileSync(abs, "utf8");
     } catch (error) {
       gaps.push({ kind: "UNREADABLE_FILE", file: rel, detail: error.message });
       continue;
     }
     for (const p of scanText(text, rel)) points.push(p);
+    // 字符串兜底（§5.3 第 3 条）：只在给了已装依赖名集合时才跑，双条件过滤后计入。
+    // **必须去重**：`require("chalk")` 里的 "chalk" 也是形似包名的字面量，
+    // 但它已被 `require` 结构化抽取覆盖；再计一次就是同一引用点算两遍（假阳性）。
+    if (options.depNames) {
+      for (const hit of findBarePackageLiterals(text, options.depNames)) {
+        const already = points.some(
+          (p) => p.file === rel && p.line === hit.line && p.specifier === hit.specifier,
+        );
+        if (already) continue;
+        points.push({ file: rel, line: hit.line, kind: "string-literal", specifier: hit.specifier, imported: [] });
+      }
+    }
   }
   points.sort((a, b) =>
     a.file === b.file ? a.line - b.line : a.file < b.file ? -1 : 1,

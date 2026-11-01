@@ -13,11 +13,11 @@ import {
   STATUS,
   UNPARSEABLE,
 } from "./contract.mjs";
-import { matchSubpath, resolveConditional, substituteWildcard } from "./resolve.mjs";
+import { matchSubpath, resolveConditional, substituteWildcard, CONDITIONS } from "./resolve.mjs";
 import { splitSpecifier } from "./snapshot.mjs";
 
-const ESM_ORDER = ["node", "import", "default"];
-const CJS_ORDER = ["node", "require", "default"];
+const ESM_ORDER = CONDITIONS.import;
+const CJS_ORDER = CONDITIONS.require;
 
 /**
  * 对一个引用点求判定态。
@@ -75,8 +75,8 @@ export function judgePoint(point, deps) {
 
   const sub = matchSubpath(dep.index, split.subpath);
 
-  // ③ 子路径不在 exports 里 / 被 null 屏蔽 → NOT-EXPORTED-SUBPATH
-  if (sub.kind === "none" || sub.value === null) {
+  // ③ 子路径不在 exports 里 → NOT-EXPORTED-SUBPATH
+  if (sub.kind === "none") {
     return {
       status: STATUS.NOT_EXPORTED_SUBPATH,
       evidence: {
@@ -84,7 +84,26 @@ export function judgePoint(point, deps) {
         line: point.line,
         pkg: split.name,
         subpath: split.subpath,
-        rule: sub.kind === "none" ? "exports 未列该子路径" : "exports 显式 null 屏蔽",
+        rule: "exports 未列该子路径",
+        exportsKeys: dep.index.entries.map((e) => e.key),
+      },
+    };
+  }
+
+  // ③b `null` 屏蔽（含数组里落成 blocked 的形态）→ 也是 NOT-EXPORTED-SUBPATH，
+  //     不是"不存在"（`data/README.md` §5 形态③）。逐视角求值才能看见数组里的 null。
+  const isRequirePoint = point.kind === "require";
+  const esmResolved = resolveTarget(dep, sub, split.subpath, ESM_ORDER);
+  const ownResolved = isRequirePoint ? resolveTarget(dep, sub, split.subpath, CJS_ORDER) : esmResolved;
+  if (ownResolved.state === "blocked" || esmResolved.state === "blocked") {
+    return {
+      status: STATUS.NOT_EXPORTED_SUBPATH,
+      evidence: {
+        file: point.file,
+        line: point.line,
+        pkg: split.name,
+        subpath: split.subpath,
+        rule: "exports 显式 null 屏蔽",
         exportsKeys: dep.index.entries.map((e) => e.key),
       },
     };
@@ -93,13 +112,11 @@ export function judgePoint(point, deps) {
   // ④ ESM-CJS-MISMATCH：`data/README.md` §5.2 的**四条同时成立**。
   //    核心判据是"exports 无 require 分支"，**不是** type 字段——zod/date-fns/glob 都是
   //    type: module 却有 require 分支，require() 行为正常，必须判 RESOLVED。
-  const isRequireKind = point.kind === "require";
-  if (isRequireKind) {
-    const esmResolved = resolveTarget(dep, sub, split.subpath, ESM_ORDER);
+  if (isRequirePoint) {
     const typeIsModule = dep.type === "module";
     const noRequireBranch = dep.hasRequireBranch === false;
     const looksEsmOnly = typeIsModule || isMjsTarget(esmResolved.target);
-    if (looksEsmOnly && noRequireBranch && esmResolved.ok) {
+    if (looksEsmOnly && noRequireBranch && esmResolved.state === "ok") {
       const esmSurface = readExportSurface(dep, esmResolved.target);
       const requested = (point.imported ?? []).filter((s) => s !== "*" && s !== "");
       // 第 4 条：被取用的 API 不在命名空间上、而在 `.default` 下。
@@ -126,14 +143,14 @@ export function judgePoint(point, deps) {
   }
 
   // ⑤ 读导出集（静态）。读不出 → UNPARSEABLE（进 gaps，不判 MISSING）
-  const target = resolveTarget(dep, sub, split.subpath, isRequireKind ? CJS_ORDER : ESM_ORDER);
-  if (!target.ok) {
+  const target = ownResolved;
+  if (target.state !== "ok") {
     return {
       status: null,
       gap: {
         kind: "UNRESOLVABLE_TARGET",
         pkg: split.name,
-        detail: `条件集不匹配或目标不可解析（视角=${isRequireKind ? "require" : "import"}）`,
+        detail: `条件集不匹配或目标非法（视角=${isRequirePoint ? "require" : "import"}；state=${target.state}）`,
       },
       evidence: { file: point.file, line: point.line, pkg: split.name, subpath: split.subpath },
     };
@@ -187,9 +204,9 @@ function isMjsTarget(target) {
 }
 
 /** 按视角解析出目标文件。通配先替换再走条件解析。 */
-function resolveTarget(dep, sub, subpath, order) {
-  const value = sub.kind === "pattern" ? substituteWildcard(sub.patternKey, subpath, sub.value) : sub.value;
-  return resolveConditional(value, order);
+function resolveTarget(dep, sub, subpath, conditions) {
+  const value = sub.kind === "pattern" ? substituteWildcard(sub.key, subpath, sub.value) : sub.value;
+  return resolveConditional(value, conditions);
 }
 
 /**

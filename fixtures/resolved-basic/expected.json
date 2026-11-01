@@ -1,0 +1,91 @@
+{
+  "$schema": "fixtures/expected.schema.md",
+  "case": "C1",
+  "name": "resolved-basic",
+  "milestone": "M2",
+  "verifies": "RESOLVED",
+  "source": {
+    "packages": ["chalk@6.0.1", "zod@4.6.7", "date-fns@4.4.0", "glob@14.0.3", "commander@15.0.0"],
+    "provenance": "data/packages/*.json（生成器产物，禁手改）",
+    "note": "包必须真实安装后由 bench 复现；本文件的 evidence 字段在 M2 按实际 exports 回填"
+  },
+  "expect": {
+    "exitCode": 0,
+    "summary": {
+      "problems": 0,
+      "gaps": 0
+    }
+  },
+  "points": [
+    {
+      "id": "c1-1",
+      "file": "src/index.mjs",
+      "line": 3,
+      "kind": "import",
+      "specifier": "chalk",
+      "imported": ["default"],
+      "status": "RESOLVED",
+      "evidence": {
+        "rule": "data/README.md §5.4 #1",
+        "exportsPath": ["exports", ".", "default"],
+        "toFillIn": "M2：给出 exports 字段原文片段 + 目标文件里 default 导出的行号"
+      }
+    },
+    {
+      "id": "c1-2",
+      "file": "src/index.mjs",
+      "line": 4,
+      "kind": "require",
+      "specifier": "zod",
+      "imported": ["z"],
+      "status": "RESOLVED",
+      "evidence": {
+        "rule": "data/README.md §5.2 反面判据（有 require 分支 → 必须 RESOLVED）",
+        "exportsPath": ["exports", ".", "require"],
+        "toFillIn": "M2"
+      }
+    },
+    {
+      "id": "c1-3",
+      "file": "src/index.mjs",
+      "line": 5,
+      "kind": "require",
+      "specifier": "date-fns",
+      "imported": ["addDays"],
+      "status": "RESOLVED",
+      "evidence": {
+        "rule": "data/README.md §5.2 反面判据",
+        "exportsPath": ["exports", ".", "require"],
+        "toFillIn": "M2"
+      }
+    },
+    {
+      "id": "c1-4",
+      "file": "src/index.mjs",
+      "line": 6,
+      "kind": "require",
+      "specifier": "glob",
+      "imported": ["globSync"],
+      "status": "RESOLVED",
+      "evidence": {
+        "rule": "data/README.md §5.2 反面判据",
+        "exportsPath": ["exports", ".", "require"],
+        "toFillIn": "M2"
+      }
+    },
+    {
+      "id": "c1-5",
+      "file": "src/index.mjs",
+      "line": 7,
+      "kind": "require",
+      "specifier": "commander",
+      "imported": ["Command"],
+      "status": "RESOLVED",
+      "evidence": {
+        "rule": "data/README.md §5.4.1（无 require 分支但具名导出在命名空间上 → 不得判 MISMATCH）",
+        "exportsPath": ["exports", ".", "default"],
+        "toFillIn": "M2：这条是本 case 最容易被误判成 MISMATCH 的一条"
+      }
+    }
+  ]
+}

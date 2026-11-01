@@ -1,0 +1,93 @@
+{
+  "$schema": "fixtures/expected.schema.md",
+  "case": "C4",
+  "name": "subpath-blocked",
+  "milestone": "M2",
+  "verifies": "NOT-EXPORTED-SUBPATH",
+  "source": {
+    "packages": ["chalk@6.0.1", "commander@15.0.0", "zod@4.6.7", "glob@14.0.3"],
+    "provenance": "data/packages/*.json 的 exposesPackageJson 字段",
+    "note": "null 屏蔽形态五包构造不出，由 tests/resolve.test.mjs 形态③（实测 exact-null-blocked）钉住"
+  },
+  "expect": {
+    "exitCode": 1,
+    "summary": {
+      "problems": 3,
+      "gaps": 0,
+      "byStatus": {
+        "NOT-EXPORTED-SUBPATH": 3,
+        "RESOLVED": 2
+      }
+    }
+  },
+  "points": [
+    {
+      "id": "c4-1",
+      "file": "src/a.cjs",
+      "line": 2,
+      "kind": "require",
+      "specifier": "chalk/package.json",
+      "imported": [],
+      "status": "NOT-EXPORTED-SUBPATH",
+      "evidence": {
+        "rule": "data/README.md §5 形态③（未列该子路径）",
+        "exposesPackageJson": false,
+        "toFillIn": "M2"
+      }
+    },
+    {
+      "id": "c4-2",
+      "file": "src/b.cjs",
+      "line": 2,
+      "kind": "require",
+      "specifier": "commander/package.json",
+      "imported": [],
+      "status": "NOT-EXPORTED-SUBPATH",
+      "evidence": {
+        "rule": "data/README.md §5 形态③（未列该子路径）",
+        "exposesPackageJson": false,
+        "toFillIn": "M2"
+      }
+    },
+    {
+      "id": "c4-3",
+      "file": "src/c.cjs",
+      "line": 2,
+      "kind": "require",
+      "specifier": "chalk/source/index.js",
+      "imported": [],
+      "status": "NOT-EXPORTED-SUBPATH",
+      "evidence": {
+        "rule": "data/README.md §5 形态③（exports 只暴露 '.'，其余子路径一律封装）",
+        "toFillIn": "M2"
+      }
+    },
+    {
+      "id": "c4-4-counterexample",
+      "file": "src/d.cjs",
+      "line": 2,
+      "kind": "require",
+      "specifier": "zod/package.json",
+      "imported": [],
+      "status": "RESOLVED",
+      "evidence": {
+        "rule": "反面判据：该包显式列了 './package.json'",
+        "exposesPackageJson": true,
+        "toFillIn": "M2"
+      }
+    },
+    {
+      "id": "c4-5-counterexample",
+      "file": "src/e.cjs",
+      "line": 2,
+      "kind": "require",
+      "specifier": "glob/raw",
+      "imported": [],
+      "status": "RESOLVED",
+      "evidence": {
+        "rule": "反面判据：该包显式列了 './raw'",
+        "toFillIn": "M2"
+      }
+    }
+  ]
+}

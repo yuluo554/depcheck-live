@@ -95,7 +95,6 @@ const RELEASE_MILESTONE = 6;
  */
 const PENDING_TOOLS = {
   "tools/check-release.mjs": 6,
-  "tools/gen-fingerprints.mjs": 1,
 };
 /** 确实不打算实现时逐条登记 + 写理由（本项目当前为空）。 */
 const EXEMPT_TOOLS = new Set([]);
