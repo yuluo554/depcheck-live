@@ -197,3 +197,29 @@ false
 > 判据落在"被取用的符号能否从命名空间直达"，不是"有没有 require 分支"这一条。
 > 只看第 2 条会把 `commander` 误判成 MISMATCH（**系统性假阳性**）。
 > 这正是 §5.2 要四条同时成立的原因，M3 的 `bench` 必须覆盖 `commander` 这个反例。
+
+#### 5.4.2 判定顺序的一条**结构性后果**（M2 实测，语料构造必须遵守）
+
+`plan/03` §4.4 的判定顺序是"首个成立者胜"，`ESM-CJS-MISMATCH` 排在 `MISSING-EXPORT` **之前**。
+因此：
+
+> **在无 `require` 分支的包上，CJS 视角取一个不存在的符号，永远到不了 `MISSING-EXPORT`**。
+
+以 `chalk@6.0.1`（无 `require` 分支）为例：
+
+| 引用点 | 事实 | 判定 |
+|---|---|---|
+| `const { red } = require("chalk")` | `red` 真实存在（在 `.default` 下），命名空间上没有 | `ESM-CJS-MISMATCH` |
+| `const { notARealExport } = require("chalk")` | 该名字根本不存在 | **也是** `ESM-CJS-MISMATCH` |
+
+两条都先命中第 2 条判据（无 `require` 分支 + 取用符号不在命名空间上），第 4 条判据无从区分
+"名字在 `.default` 下" 与 "名字压根不存在"——**在不执行被测代码的前提下也区分不了**。
+
+这不是缺陷，是判据的**固有边界**，与 `plan/06` R2"误报比漏报代价高"一致：
+判成"格式失配"比判成"缺导出"更保守，且给出了修复方向（改用 `import`）。
+
+**对语料的约束**（M2 据此修正了 C2）：
+`MISSING-EXPORT` 的**正例**必须在**有 `require` 分支**的包上、或以 **ESM 视角**构造；
+CJS 视角只用于构造 `ESM-CJS-MISMATCH` 的正例（见 `fixtures/missing-export/`）。
+`M3` 的 `bench` 与 `SKILL.md` 契约块在描述判定能力时，必须体现这条边界，**不得**宣称
+"CJS 视角取错名字会报 MISSING-EXPORT"。

@@ -1,0 +1,10 @@
+{
+  "name": "c5-ambiguous-dynamic",
+  "version": "0.0.0",
+  "private": true,
+  "description": "C5 语料：五种动态形态各一例 + 一条静态对照",
+  "dependencies": {
+    "chalk": "^6.0.1",
+    "zod": "^4.6.7"
+  }
+}

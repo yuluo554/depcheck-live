@@ -254,3 +254,88 @@ test("selftest / bench 未实现时退出 3（不假装成功）", () => {
   assert.equal(run(["bench"]).code, 3);
   assert.match(run(["bench"]).err, /尚未实现/);
 });
+
+test("drift 未实现时退出 3（M3 落位，不假装成功）", () => {
+  const r = run(["drift", "."]);
+  assert.equal(r.code, 3);
+  assert.match(r.err, /尚未实现/);
+});
+
+test("snapshot：事实层算得出 → 退出 0；不缺依赖时不因'没判定'退出 1", () => {
+  const dir = makeProject({
+    "package.json": '{"name":"p","version":"0.0.0","dependencies":{"chalk":"^6.0.1"}}',
+    "node_modules/chalk/package.json": CHALK_PKG,
+    "node_modules/chalk/source/index.js": CHALK_ENTRY,
+  });
+  try {
+    const r = run(["snapshot", ".", "--json"], dir);
+    assert.equal(r.code, 0, `应 0，实际 ${r.code}：${r.out.slice(0, 300)}`);
+    const parsed = JSON.parse(r.out);
+    assert.equal(parsed.deps.length, 1);
+    assert.equal(parsed.deps[0].name, "chalk");
+    assert.equal(parsed.deps[0].parseState, "OK");
+    assert.equal(parsed.deps[0].hasRequireBranch, false, "chalk 实测无 require 分支");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("snapshot：缺依赖包 → 退出 3（覆盖率缺口算不了，不是'没问题'）", () => {
+  const dir = makeProject({
+    "package.json": '{"name":"p","version":"0.0.0","dependencies":{"chalk":"^6.0.1","zod":"^4.6.7"}}',
+    "node_modules/chalk/package.json": CHALK_PKG,
+    "node_modules/chalk/source/index.js": CHALK_ENTRY,
+  });
+  try {
+    const r = run(["snapshot", ".", "--json"], dir);
+    assert.equal(r.code, 3, `缺一个包应 3，实际 ${r.code}`);
+    const parsed = JSON.parse(r.out);
+    assert.ok(parsed.gaps.some((g) => g.pkg === "zod" && g.kind === "NO_PACKAGE_JSON"));
+    const zod = parsed.deps.find((d) => d.name === "zod");
+    assert.equal(zod.installedVersion, null, "缺失依赖不得冒充已安装");
+    assert.equal(zod.parseState, "NO_PACKAGE_JSON");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("scan：抽出引用点并按 file/line 排序；AMBIGUOUS 显式出现；退出 0", () => {
+  const dir = makeProject({
+    "package.json": '{"name":"p","version":"0.0.0","dependencies":{"chalk":"^6.0.1"}}',
+    "node_modules/chalk/package.json": CHALK_PKG,
+    "node_modules/chalk/source/index.js": CHALK_ENTRY,
+    "src/b.mjs": 'import { red } from "chalk";\n',
+    "src/a.cjs": 'const name = "chalk";\nconst m = require(name);\n',
+  });
+  try {
+    const r = run(["scan", ".", "--json"], dir);
+    assert.equal(r.code, 0, `应 0，实际 ${r.code}：${r.out.slice(0, 300)}`);
+    const parsed = JSON.parse(r.out);
+    // 排序：a.cjs 在 b.mjs 之前
+    assert.equal(parsed.points[0].file, "src/a.cjs");
+    assert.equal(parsed.points[0].kind, "ambiguous", "动态 require 必须显式落 ambiguous");
+    const staticPoint = parsed.points.find((p) => p.file === "src/b.mjs");
+    assert.equal(staticPoint.specifier, "chalk");
+    assert.deepEqual(staticPoint.imported, ["red"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("snapshot / scan 的输出也不含绝对路径（隐私红线）", () => {
+  const dir = makeProject({
+    "package.json": '{"name":"p","version":"0.0.0","dependencies":{"chalk":"^6.0.1"}}',
+    "node_modules/chalk/package.json": CHALK_PKG,
+    "node_modules/chalk/source/index.js": CHALK_ENTRY,
+    "src/a.mjs": 'import { red } from "chalk";\n',
+  });
+  try {
+    for (const cmd of ["snapshot", "scan"]) {
+      const r = run([cmd, "."], dir);
+      assert.ok(!r.out.includes(dir), `${cmd} 输出里出现了工程绝对路径`);
+      assert.ok(!/[A-Za-z]:[\\/]/.test(r.out), `${cmd} 输出里出现了盘符路径`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

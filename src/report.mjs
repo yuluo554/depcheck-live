@@ -49,3 +49,51 @@ export function renderHuman(result) {
 export function renderJson(result) {
   return `${JSON.stringify(result, null, 2)}\n`;
 }
+
+/** `snapshot` 人读：每个直接依赖一行事实（不含判定结论——那是 `check` 的事）。 */
+export function renderSnapshot(snapshot) {
+  if (!snapshot.ok) return `${TOOL}: 无法计算（${snapshot.reason}）\n`;
+  const lines = [`${TOOL} snapshot · 直接依赖 ${snapshot.deps.length} 个`];
+  for (const d of snapshot.deps) {
+    const parts = [
+      `${d.name}@${d.installedVersion ?? "<未安装>"}`,
+      `type=${d.type ?? "commonjs(默认)"}`,
+      `parseState=${d.parseState}`,
+      `require分支=${d.hasRequireBranch === null ? "<未知>" : d.hasRequireBranch ? "有" : "无"}`,
+      `./package.json=${d.exposesPackageJson ? "暴露" : "屏蔽"}`,
+      `指纹=${d.exportsFingerprint ?? "-"}`,
+    ];
+    lines.push(`  ${parts.join(" · ")}`);
+    if (d.ignoredExportKeys?.length > 0) {
+      lines.push(`    被 Node 忽略的 exports 键: ${d.ignoredExportKeys.join(", ")}`);
+    }
+  }
+  if (snapshot.gaps.length > 0) {
+    lines.push("");
+    lines.push("算不了（计入覆盖缺口，不代表代码有错）：");
+    for (const g of snapshot.gaps) {
+      lines.push(`  ${g.kind}${g.pkg ? ` [${g.pkg}]` : ""} ${g.detail ?? ""}`.trimEnd());
+    }
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+/** `scan` 人读：逐引用点一行（`AMBIGUOUS` 显式列出，不静默）。 */
+export function renderScan(scan) {
+  const lines = [`${TOOL} scan · 源码 ${scan.files.length} 个文件 · 引用点 ${scan.points.length} 个`];
+  for (const p of scan.points) {
+    const imp = p.imported?.length > 0 ? ` {${p.imported.join(",")}}` : "";
+    const spec = p.specifier === null ? `<不可静态确定>` : p.specifier;
+    lines.push(`  ${p.file}:${p.line} ${p.kind} ${spec}${imp}`);
+    if (p.note) lines.push(`    ${p.note}`);
+  }
+  if (scan.gaps.length > 0) {
+    lines.push("");
+    lines.push("算不了（计入覆盖缺口，不代表代码有错）：");
+    for (const g of scan.gaps) {
+      const where = g.file ? ` ${g.file}${g.line ? `:${g.line}` : ""}` : "";
+      lines.push(`  ${g.kind}${g.pkg ? ` [${g.pkg}]` : ""}${where} ${g.detail ?? ""}`.trimEnd());
+    }
+  }
+  return `${lines.join("\n")}\n`;
+}

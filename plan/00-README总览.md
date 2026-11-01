@@ -9,8 +9,8 @@
 | 00 | `plan/00-README总览.md` | ✅ 本文件 |
 | 01 | `plan/01-题目文档.md` | ✅ 定稿 v1 |
 | 02 | `plan/02-架构与技术选型.md` | ✅ M0 |
-| 03 | `plan/03-模块详设.md` | ✅ M0（骨架级，M2/M3 回填实现细节） |
-| 04 | `plan/04-数据计划.md` | ✅ M0（语料清单定稿，M2 落 `fixtures/`） |
+| 03 | `plan/03-模块详设.md` | ✅ M2（模块 ①②③ 已回填实测口径；④⑤ 待 M3/M4） |
+| 04 | `plan/04-数据计划.md` | ✅ M2（语料 C1–C5 已落地并逐点对账；C6/C7 待 M3/M4） |
 | 05 | `plan/05-里程碑与发布.md` | ✅ M0 |
 | 06 | `plan/06-交付对标与决策.md` | ✅ M0 |
 | — | `data/README.md` | ✅ 依据查证 + 口径唯一定义 |
@@ -74,7 +74,7 @@
 |---|---|---|
 | M0 | 计划套件 + 方法论装订 + 可运行骨架（CLI 参数面 + 模块接口 + 两道门） | ✅ 已完成 |
 | M1 | 数据先行：`exports` 六形态语义核对入 `data/README` §5、五包对照组指纹与六份语料定稿 | ✅ 已完成 |
-| M2 | 解析层：`exports` 解析器 + 引用点抽取器 + `fixtures/` 骨架 | ⬜ 待 M2 |
+| M2 | 解析层：`exports` 解析器 + 引用点抽取器 + `fixtures/` 落地（含 `snapshot` / `scan` 命令） | ✅ 已完成 |
 | M3 | 判定层：五个判定态 + `drift`（离线指纹） | ⬜ 待 M3 |
 | M4 | 基准：`bench` / `selftest` / 退出码断言 / 干净零误报集 | ⬜ 待 M4 |
 | M5 | 交付：CLI 完整面 + `SKILL.md`（契约块双向断言）+ 技术报告 + demo GIF | ⬜ 待 M5 |
@@ -109,7 +109,7 @@
 | 架构选型 | `plan/02-架构与技术选型.md` | M0 | `git ls-files` |
 | 模块详设 | `plan/03-模块详设.md` | M0 | `git ls-files` |
 | 数据计划 | `plan/04-数据计划.md` | M0 | `git ls-files` |
-| 基准语料 | `fixtures/*/INPUT.md` + `expected.json` | M2 | `git ls-files fixtures/` |
+| 基准语料 | `fixtures/*/INPUT.md` + `expected.json` + `src/` | ✅ M2（C1–C5；C6 属 M3、C7 属 M4） | `git ls-files fixtures/` |
 | 自测与基准 | `tests/` + `selftest`/`bench` 命令 | M3/M4 | `npm test && node bin/depcheck-live.mjs bench` |
 | Agent Skill | `SKILL.md` | M5 | `git ls-files SKILL.md` |
 | 技术报告 | `docs/技术报告.md` | M5 | `git ls-files docs/` |

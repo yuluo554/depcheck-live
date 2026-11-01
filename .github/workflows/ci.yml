@@ -61,9 +61,13 @@ jobs:
           tests/paths.test.mjs
           tests/resolve.test.mjs
           tests/scan.test.mjs
+          tests/scan-edge.test.mjs
+          tests/scan-large-file.test.mjs
           tests/fingerprints.test.mjs
           tests/thresholds.test.mjs
           tests/fixtures.test.mjs
+          tests/fixtures-layout.test.mjs
+          tests/fixtures-run.test.mjs
           tests/cli.test.mjs
       - name: CLI 冒烟（退出码 0 / 4 / 3）
         shell: bash

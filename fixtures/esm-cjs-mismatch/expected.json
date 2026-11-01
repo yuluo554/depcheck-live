@@ -26,40 +26,44 @@
     {
       "id": "c3-1-chalk",
       "file": "src/against-chalk.cjs",
-      "line": 2,
+      "line": 3,
       "kind": "require",
       "specifier": "chalk",
       "imported": ["red"],
       "status": "ESM-CJS-MISMATCH",
       "evidence": {
         "rule": "data/README.md §5.2 四条同时成立",
+        "exportsSnippet": "\"exports\": { \"types\": \"./source/index.d.ts\", \"default\": \"./source/index.js\" }",
         "type": "module",
         "hasRequireBranch": false,
-        "observed": "require('chalk').red === undefined；red 在 .default 下",
-        "toFillIn": "M2"
+        "observed": "require('chalk').red === undefined；red 在 .default 下（source/index.d.ts:253 `readonly red: this;`）",
+        "target": "./source/index.js",
+        "why": "四条全部成立：type=module、无 require 分支、引用点是 require、被取用的 red 不在命名空间（14 个具名导出里没有它）"
       }
     },
     {
       "id": "c3-2-commander",
       "file": "src/against-commander.cjs",
-      "line": 2,
+      "line": 3,
       "kind": "require",
       "specifier": "commander",
       "imported": ["Command"],
       "status": "RESOLVED",
       "evidence": {
         "rule": "data/README.md §5.4.1 反面判据（无 require 分支但符号在命名空间上 → 不得判 MISMATCH）",
+        "exportsSnippet": "\".\": { \"types\": \"./typings/index.d.ts\", \"default\": \"./index.js\" }",
         "type": "module",
         "hasRequireBranch": false,
-        "observed": "require('commander').Command === function",
-        "toFillIn": "M2",
-        "whyThisPointMatters": "这是唯一能把'只看 hasRequireBranch'的实现判红的条目"
+        "observed": "require('commander').Command === function；命名空间有 11 个具名导出（program / Command / Option / …），且 ns.default === undefined",
+        "target": "./index.js",
+        "targetEvidence": "node_modules/commander/index.js:19 `export { Command, Option, Argument, Help };`",
+        "whyThisPointMatters": "这是唯一能把'只看 hasRequireBranch'的实现判红的条目：与 c3-1 同为 hasRequireBranch=false，判定相反"
       }
     },
     {
       "id": "c3-3-zod",
       "file": "src/against-zod.cjs",
-      "line": 2,
+      "line": 3,
       "kind": "require",
       "specifier": "zod",
       "imported": ["z"],
@@ -68,13 +72,15 @@
         "rule": "data/README.md §5.2 反面判据（有 require 分支 → 必须 RESOLVED）",
         "type": "module",
         "hasRequireBranch": true,
-        "toFillIn": "M2"
+        "target": "./index.cjs",
+        "targetEvidence": "node_modules/zod/index.cjs:31 `exports.z = z;`",
+        "why": "type 仍是 module，但有 require 分支 → require() 走真 CJS 产物，取 z 成功"
       }
     },
     {
       "id": "c3-4-date-fns",
       "file": "src/against-date-fns.cjs",
-      "line": 2,
+      "line": 3,
       "kind": "require",
       "specifier": "date-fns",
       "imported": ["addDays"],
@@ -83,13 +89,15 @@
         "rule": "data/README.md §5.2 反面判据",
         "type": "module",
         "hasRequireBranch": true,
-        "toFillIn": "M2"
+        "target": "./index.cjs",
+        "targetEvidence": "node_modules/date-fns/index.cjs 的 245 组 Object.keys 桶转发；./addDays.cjs:2 `exports.addDays = addDays;`",
+        "why": "有 require 分支 → CJS 视角 → 桶文件递归后导出集含 addDays"
       }
     },
     {
       "id": "c3-5-glob",
       "file": "src/against-glob.cjs",
-      "line": 2,
+      "line": 3,
       "kind": "require",
       "specifier": "glob",
       "imported": ["globSync"],
@@ -98,13 +106,16 @@
         "rule": "data/README.md §5.2 反面判据",
         "type": "module",
         "hasRequireBranch": true,
-        "toFillIn": "M2"
+        "target": "./dist/commonjs/index.min.js",
+        "targetEvidence": "node_modules/glob/dist/commonjs/index.min.js:2 `exports.globSync=hs`",
+        "why": "有 require 分支；目标目录自带 type=commonjs，必须按**最近 package.json** 判模块类型（按包根判会读成空导出集）"
       }
     }
   ],
   "falsification": {
     "againstTypeFieldOnly": "五包全 type=module：按 type 判会 5 条全红，与期望的 1 红 4 绿相反",
     "againstHasRequireBranchOnly": "chalk 与 commander 同为 hasRequireBranch=false 但判定相反；只看该字段会让 c3-2 红",
-    "againstAlwaysResolved": "c3-1 必须红"
+    "againstAlwaysResolved": "c3-1 必须红",
+    "againstNoReexportRecursion": "date-fns 与 glob 的出口都是桶/产物文件，不递归相对 re-export 会把 c3-4、c3-5 判成 MISSING-EXPORT（M2 修前实测如此）"
   }
 }

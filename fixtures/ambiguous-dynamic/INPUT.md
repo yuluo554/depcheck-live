@@ -10,11 +10,23 @@
 | 引用点 | 文件 | 写法 | 形态 |
 |---|---|---|---|
 | 1 | `src/dyn-var.cjs` | `const name = "chalk"; require(name)` | 变量间接 |
-| 2 | `src/dyn-concat.cjs` | `` require(`./${x}`) `` | 模板拼接 |
+| 2 | `src/dyn-concat.cjs` | `` require(`chalk/${x}`) `` | 模板拼接（含插值） |
 | 3 | `src/dyn-import.cjs` | `const m = await import(someVar)` | 动态 import 变量 |
-| 4 | `src/dyn-config.mjs` | 配置对象里 `plugins: [pkgName]` 且 `pkgName` 是变量 | 运行时生成 |
+| 4 | `src/dyn-config.mjs` | `require(config.plugins[0])`，`plugins[0]` 来自 `process.env.PLUGIN` | 运行时生成 |
 | 5 | `src/dyn-prop.cjs` | `require("chalk" + suffix)` | 字面量+变量拼接 |
 | 6（对照） | `src/static.mjs` | `import { z } from "zod"` | **静态字面量** → 必须 `RESOLVED`，不是 AMBIGUOUS |
+
+> ⚠️ **M2 修正了两处构造**（原 M1 骨架的写法跑不出预期）：
+>
+> 1. **点 4** 原写"配置对象里 `plugins: [pkgName]`"。但本工具的引用点是**加载调用点**
+>    （`plan/03` §3），配置对象本身没有调用 → 不存在可判对象。现改为
+>    `require(config.plugins[0])`：既保留"运行时生成"这一形态，又落在一个真实的调用点上。
+> 2. 配置对象里**不得出现字面量包名**：`plugins: ["zod"]` 是 `plan/03` §3 的合法
+>    `string-literal` 引用点，会额外产出一条 `RESOLVED`（那是设计内行为，不是误报），
+>    会污染本 case 的 `ambiguous === 5` 断言。故该点只放变量。
+>
+> 另注：`require(`chalk`)` 这种**不含插值**的模板串是**静态**的（参数可静态确定），
+> 所以点 2 必须写成带插值的 `` `chalk/${x}` `` 才构成 AMBIGUOUS。
 
 ## 为什么这条构造能证伪
 
@@ -43,4 +55,5 @@
 退出码 **`0`**（仅 AMBIGUOUS，无确证问题）；点 1–5 为 `AMBIGUOUS`；点 6 为 `RESOLVED`；
 `summary.ambiguous === 5`；`summary.problems === 0`；`summary.totalPoints >= 6`。
 
-> **M1 状态**：`INPUT.md` 已定稿；`expected.json` 的逐点 `evidence` 待 M2 补齐。
+> **M2 状态**：`expected.json` 的逐点 `evidence` 已按实读 `exports` 原文片段 + 目标文件行号回填
+> （无 `toFillIn` 残留）；`src/` 与 `package.json` 已在 M2 落地，`tests/fixtures-run.test.mjs` 逐点对账。

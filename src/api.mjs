@@ -156,3 +156,24 @@ export function decideExit(result) {
   if (result.gaps.length > 0) return "CANNOT_COMPUTE";
   return "OK";
 }
+
+/**
+ * `snapshot` 的退出码：只看**事实层算不算得出来**。
+ * 它不做判定，因此**永不退出 1**——把"某个包 exports 解析不了"读成"发现问题"是错的，
+ * 那是覆盖率缺口（§5.1 的 3）。
+ */
+export function decideSnapshotExit(snapshot) {
+  if (!snapshot.ok) return "CANNOT_COMPUTE";
+  if (snapshot.gaps.length > 0) return "CANNOT_COMPUTE";
+  return "OK";
+}
+
+/**
+ * `scan` 的退出码：同理只看事实层。
+ * 唯一例外是"工程连 `package.json` 都没有"（`scan` 仍能扫源码，但已无处挂靠依赖面）
+ * ——这一条由调用方按 `ok` 判，不在这里凭空升级成问题。
+ */
+export function decideScanExit(scan) {
+  if (!scan.ok) return "CANNOT_COMPUTE";
+  return "OK";
+}

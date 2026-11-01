@@ -24,69 +24,79 @@
     {
       "id": "c4-1",
       "file": "src/a.cjs",
-      "line": 2,
+      "line": 3,
       "kind": "require",
       "specifier": "chalk/package.json",
       "imported": [],
       "status": "NOT-EXPORTED-SUBPATH",
       "evidence": {
         "rule": "data/README.md §5 形态③（未列该子路径）",
+        "exportsSnippet": "\"exports\": { \"types\": \"./source/index.d.ts\", \"default\": \"./source/index.js\" }",
+        "exportsKeys": ["."],
         "exposesPackageJson": false,
-        "toFillIn": "M2"
+        "why": "chalk 的 exports 只有两个**条件键**（sugar 形态，等价于 {\".\": …}），keys 里没有 \"./package.json\" → 屏蔽"
       }
     },
     {
       "id": "c4-2",
       "file": "src/b.cjs",
-      "line": 2,
+      "line": 3,
       "kind": "require",
       "specifier": "commander/package.json",
       "imported": [],
       "status": "NOT-EXPORTED-SUBPATH",
       "evidence": {
         "rule": "data/README.md §5 形态③（未列该子路径）",
+        "exportsSnippet": "\".\": { \"types\": \"./typings/index.d.ts\", \"default\": \"./index.js\" }",
+        "exportsKeys": ["."],
         "exposesPackageJson": false,
-        "toFillIn": "M2"
+        "why": "commander 只导出 \".\"，未列 \"./package.json\""
       }
     },
     {
       "id": "c4-3",
       "file": "src/c.cjs",
-      "line": 2,
+      "line": 3,
       "kind": "require",
       "specifier": "chalk/source/index.js",
       "imported": [],
       "status": "NOT-EXPORTED-SUBPATH",
       "evidence": {
         "rule": "data/README.md §5 形态③（exports 只暴露 '.'，其余子路径一律封装）",
-        "toFillIn": "M2"
+        "exportsKeys": ["."],
+        "why": "Node 原文：一旦声明 exports，包内全部子路径被封装（all subpaths of the package are encapsulated）。本条与 c4-1 同判据但子路径不同——证明屏蔽不是只针对 package.json 的特例"
       }
     },
     {
       "id": "c4-4-counterexample",
       "file": "src/d.cjs",
-      "line": 2,
+      "line": 3,
       "kind": "require",
       "specifier": "zod/package.json",
       "imported": [],
       "status": "RESOLVED",
       "evidence": {
         "rule": "反面判据：该包显式列了 './package.json'",
+        "exportsSnippet": "\"./package.json\": \"./package.json\"",
+        "target": "./package.json",
         "exposesPackageJson": true,
-        "toFillIn": "M2"
+        "why": "同一个写法、同一个子路径，zod 判 RESOLVED——这正是'不能想当然认为 package.json 总是可读'的可执行形态"
       }
     },
     {
       "id": "c4-5-counterexample",
       "file": "src/e.cjs",
-      "line": 2,
+      "line": 3,
       "kind": "require",
       "specifier": "glob/raw",
       "imported": [],
       "status": "RESOLVED",
       "evidence": {
         "rule": "反面判据：该包显式列了 './raw'",
-        "toFillIn": "M2"
+        "exportsSnippet": "\"./raw\": { \"import\": { … \"./dist/esm/index.js\" }, \"require\": { … \"./dist/commonjs/index.js\" } }",
+        "target": "./dist/commonjs/index.js",
+        "exposesPackageJson": true,
+        "why": "glob 是五包里唯一带**具名子路径** + 嵌套条件的包；它同时钉住'子路径命中'与'条件按键序'两条规则"
       }
     }
   ]

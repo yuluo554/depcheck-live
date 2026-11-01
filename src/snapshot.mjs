@@ -48,6 +48,8 @@ export function readProject(root) {
         type: null,
         exportsFingerprint: null,
         exposesPackageJson: false,
+        hasRequireBranch: null,
+        ignoredExportKeys: [],
         parseState: "NO_PACKAGE_JSON",
       });
       gaps.push({ kind: "NO_PACKAGE_JSON", pkg: name, detail: "node_modules 下没有该包的 package.json" });
@@ -62,6 +64,8 @@ export function readProject(root) {
         type: null,
         exportsFingerprint: null,
         exposesPackageJson: false,
+        hasRequireBranch: null,
+        ignoredExportKeys: [],
         parseState: "NO_PACKAGE_JSON",
       });
       gaps.push({ kind: "NO_PACKAGE_JSON", pkg: name, detail: `package.json 不可解析: ${depPkg.error}` });
@@ -77,6 +81,9 @@ export function readProject(root) {
       exportsFingerprint: described.fingerprint,
       exposesPackageJson: described.exposesPackageJson,
       hasRequireBranch: described.hasRequireBranch,
+      // 被 Node 忽略的键（末尾斜杠 / 多 `*`）：只留档，不参与匹配、也不算 unparseable
+      // （`data/README.md` §5.4 #9）。别把它拼进 unparseable。
+      ignoredExportKeys: described.index.ignored,
       parseState: described.parseState,
     };
     directDeps.push(record);

@@ -7,8 +7,8 @@
 //
 // **误报比漏报代价高**：读不出导出集时记 UNPARSEABLE 进 gaps，**不判 MISSING-EXPORT**。
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join, posix } from "node:path";
 import {
   STATUS,
   UNPARSEABLE,
@@ -211,42 +211,128 @@ function resolveTarget(dep, sub, subpath, conditions) {
 
 /**
  * 静态读导出集（`plan/03` §4.3）。读不出**不猜**——返回 ok:false 让调用方记 gap。
- * 三种可识别形态：CJS 赋值形 / ESM 声明形 / ESM re-export（外部 → 不解析）。
+ *
+ * 三种可识别形态：CJS 赋值形 / ESM 声明形 / **相对 re-export 递归**。
+ * 为什么必须递归：`date-fns@4.4.0` 的入口 `index.js` 是 245 行 `export * from "./x.js"`，
+ * `zod@4.6.7` 的 `index.cjs` 是 `__exportStar(require("./v4/…"), exports)`，
+ * 只看首层会读出**空导出集**，于是每个真实引用点都变 MISSING-EXPORT（系统性假阳性）。
+ * 递归只沿**相对**路径走；外部 re-export（`export * from "pkg"`）仍记 UNPARSEABLE，
+ * 口径与 `plan/03` §4.3 一致。
  */
 export function readExportSurface(dep, targetRel) {
-  const abs = join(dep.pkgDir, targetRel);
-  let text;
-  try {
-    text = readFileSync(abs, "utf8");
-  } catch (error) {
-    return { ok: false, reason: `目标文件不可读: ${targetRel}（${error.code ?? error.message}）` };
+  const seen = new Set();
+  const names = new Set();
+  const pending = [targetRel];
+  let sawReexportExternal = false;
+  let externalFrom = null;
+  let depth = 0;
+
+  while (pending.length > 0) {
+    const rel = pending.pop();
+    if (seen.has(rel)) continue; // 环与重复桶：每个文件只读一次，递归天然收敛
+    seen.add(rel);
+    const abs = join(dep.pkgDir, rel);
+    let text;
+    try {
+      text = readFileSync(abs, "utf8");
+    } catch (error) {
+      if (depth === 0) return { ok: false, reason: `目标文件不可读: ${rel}（${error.code ?? error.message}）` };
+      continue; // 桶文件里一个分支读不到：跳过它，不因此判整包算不了
+    }
+    depth++;
+    const isEsm = isEsmFile(dep, rel);
+    const r = isEsm ? readEsmSurface(text) : readCjsSurface(text);
+    if (!r.ok) {
+      // 首层读不出 → 真算不了；桶文件某一支读不出 → 记下来，最后若无其它证据仍算不了
+      if (seen.size === 1) return r;
+      sawReexportExternal = true;
+      externalFrom = externalFrom ?? r.reason;
+      continue;
+    }
+    for (const n of r.names) names.add(n);
+    for (const next of r.relativeFrom) {
+      if (!next.startsWith("./") && !next.startsWith("../")) {
+        sawReexportExternal = true;
+        externalFrom = externalFrom ?? `外部 re-export: ${next}`;
+        continue;
+      }
+      pending.push(resolveRelative(rel, next));
+    }
   }
-  const isEsm = /\.mjs$/.test(targetRel) || (dep.type === "module" && !/\.cjs$/.test(targetRel));
-  return isEsm ? readEsmSurface(text) : readCjsSurface(text);
+
+  if (names.size === 0 && sawReexportExternal) return { ok: false, reason: externalFrom };
+  return { ok: true, names };
+}
+
+/** 把 `./x.js` 从 `rel` 所在目录解析成包内相对路径（一律正斜杠，走 posix 语义）。 */
+function resolveRelative(fromRel, specifier) {
+  return posix.normalize(posix.join(posix.dirname(fromRel), specifier));
+}
+
+/**
+ * 目标文件的模块类型 = **最近的** `package.json` 的 `type`（Node 的 Module Type 判定口径）。
+ * 不能只看包根：`glob` 的 `dist/commonjs/package.json` 写着 `type: commonjs`，而包根是
+ * `type: module`——按包根判会把 CJS 产物当 ESM 解析，导出集读成空（实测 0 个）。
+ */
+export function isEsmFile(dep, rel) {
+  if (rel.endsWith(".mjs")) return true;
+  if (rel.endsWith(".cjs")) return false;
+  let dir = posix.dirname(rel);
+  while (true) {
+    const candidate = posix.join(dir, "package.json");
+    const abs = join(dep.pkgDir, candidate);
+    if (existsSync(abs)) {
+      if (candidate === "package.json") return dep.type === "module";
+      try {
+        const pkg = JSON.parse(readFileSync(abs, "utf8"));
+        return pkg.type === "module";
+      } catch {
+        return false;
+      }
+    }
+    if (dir === "." || dir === "" || dir === "/") return dep.type === "module";
+    dir = posix.dirname(dir);
+  }
 }
 
 function readCjsSurface(text) {
   const names = new Set();
+  const relativeFrom = [];
   // module.exports = { a, b } / exports.a = / exports["a"] = / Object.defineProperty(exports, "a", …)
   for (const m of text.matchAll(/\bexports\s*\.\s*([\w$]+)\s*=/g)) names.add(m[1]);
   for (const m of text.matchAll(/\bexports\s*\[\s*["']([\w$]+)["']\s*\]\s*=/g)) names.add(m[1]);
   for (const m of text.matchAll(/\bObject\.defineProperty\s*\(\s*exports\s*,\s*["']([\w$]+)["']/g)) names.add(m[1]);
   for (const m of text.matchAll(/\bObject\.defineProperty\s*\(\s*module\.exports\s*,\s*["']([\w$]+)["']/g)) names.add(m[1]);
+  // 桶文件：`__exportStar(require("./x"), exports)`（zod 的 index.cjs 就是这一形态）
+  for (const m of text.matchAll(/__exportStar\s*\(\s*require\s*\(\s*["']([^"']+)["']\s*\)/g)) relativeFrom.push(m[1]);
+  // 桶文件（另一种）：`var _index = require("./add.cjs"); Object.keys(_index).forEach(...)`
+  // date-fns@4.4.0 的 index.cjs 是 245 组这种形态（共 8885 行）。
+  // 判据不是"有 require"（普通引用也有），而是**同一文件里对该标识符做了 `Object.keys(…)` 枚举转发**。
+  const bound = new Map();
+  for (const m of text.matchAll(/(?:const|let|var)\s+([\w$]+)\s*=\s*require\s*\(\s*["']([^"']+)["']\s*\)/g)) {
+    if (m[2].startsWith(".")) bound.set(m[1], m[2]);
+  }
+  for (const [ident, target] of bound) {
+    const escaped = ident.replace(/\$/g, "\\$");
+    if (new RegExp(`\\bObject\\.keys\\s*\\(\\s*${escaped}\\s*\\)`).test(text)) relativeFrom.push(target);
+  }
+
   const direct = /module\.exports\s*=\s*\{([\s\S]*?)\}\s*;?\s*$/m.exec(text);
   if (direct) {
     for (const m of direct[1].matchAll(/(?:^|,)\s*(?:(?:async|const|let|var|function)\s+)?([\w$]+)\s*(?:[:(,]|$)/g)) {
       names.add(m[1]);
     }
   }
-  if (/\bmodule\.exports\s*=/.test(text) && names.size === 0) {
+  if (/\bmodule\.exports\s*=/.test(text) && names.size === 0 && relativeFrom.length === 0) {
     // `module.exports = someIdentifier` / 函数 / 调用表达式：**读不出具名导出 → 不猜**
-    return { ok: false, reason: "module.exports 为表达式/标识符，具名导出集不可静态确定" };
+    return { ok: false, reason: "module.exports 为表达式/标识符，具名导出集不可静态确定", relativeFrom: [] };
   }
-  return { ok: true, names };
+  return { ok: true, names, relativeFrom };
 }
 
 function readEsmSurface(text) {
   const names = new Set();
+  const relativeFrom = [];
   let sawReexportExternal = false;
   for (const m of text.matchAll(/\bexport\s+(?:async\s+)?(?:function|class|const|let|var)\s+([\w$]+)/g)) names.add(m[1]);
   for (const m of text.matchAll(/\bexport\s*\{([^}]*)\}/g)) {
@@ -256,11 +342,17 @@ function readEsmSurface(text) {
     }
   }
   if (/\bexport\s+default\b/.test(text)) names.add("default");
-  for (const m of text.matchAll(/\bexport\s+\*\s+from\s+["']([^"']+)["']/g)) {
-    if (!m[1].startsWith(".")) sawReexportExternal = true;
+  for (const m of text.matchAll(/\bexport\s+(?:\*|\{[^}]*\})\s+from\s+["']([^"']+)["']/g)) {
+    relativeFrom.push(m[1]);
   }
-  if (sawReexportExternal && names.size === 0) {
-    return { ok: false, reason: "仅外部 re-export，具名导出集需递归解析（首期不复刻）" };
+  for (const m of text.matchAll(/\bexport\s+\*\s+as\s+[\w$]+\s+from\s+["']([^"']+)["']/g)) {
+    relativeFrom.push(m[1]);
   }
-  return { ok: true, names };
+  for (const from of relativeFrom) {
+    if (!from.startsWith(".")) sawReexportExternal = true;
+  }
+  if (sawReexportExternal && names.size === 0 && relativeFrom.every((f) => !f.startsWith("."))) {
+    return { ok: false, reason: "仅外部 re-export，具名导出集需递归解析（首期不复刻）", relativeFrom: [] };
+  }
+  return { ok: true, names, relativeFrom };
 }

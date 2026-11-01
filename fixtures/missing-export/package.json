@@ -1,0 +1,11 @@
+{
+  "name": "c2-missing-export",
+  "version": "0.0.0",
+  "private": true,
+  "description": "C2 语料：入口存在但取用的符号不在导出集里",
+  "dependencies": {
+    "chalk": "^6.0.1",
+    "date-fns": "^4.4.0",
+    "zod": "^4.6.7"
+  }
+}

@@ -47,4 +47,5 @@
 退出码 `1`；点 1–3 为 `NOT-EXPORTED-SUBPATH`；点 4–5 为 `RESOLVED`；
 `summary.problems === 3`。
 
-> **M1 状态**：`INPUT.md` 已定稿；`expected.json` 的逐点 `evidence` 待 M2 补齐。
+> **M2 状态**：`expected.json` 的逐点 `evidence` 已按实读 `exports` 原文片段 + 目标文件行号回填
+> （无 `toFillIn` 残留）；`src/` 与 `package.json` 已在 M2 落地，`tests/fixtures-run.test.mjs` 逐点对账。

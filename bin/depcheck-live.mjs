@@ -8,8 +8,9 @@
 import { resolve } from "node:path";
 import { TOOL, EXIT } from "../src/contract.mjs";
 import { parseArgv, exitCodeFor, USAGE } from "../src/cli.mjs";
-import { checkAll, decideExit } from "../src/api.mjs";
-import { renderHuman, renderJson } from "../src/report.mjs";
+import { checkAll, decideExit, decideSnapshotExit, decideScanExit } from "../src/api.mjs";
+import { snapshotAll, scanAll } from "../src/commands.mjs";
+import { renderHuman, renderJson, renderSnapshot, renderScan } from "../src/report.mjs";
 import { readVersion } from "../src/version.mjs";
 
 function main(argv) {
@@ -35,9 +36,22 @@ function main(argv) {
   }
 
   const root = resolve(opts.path);
-  if (opts.command === "snapshot" || opts.command === "scan" || opts.command === "drift") {
-    // M2/M3 落位；此刻显式报"尚未实现"，不假装成功
-    process.stderr.write(`${TOOL}: ${opts.command} 尚未实现（M${opts.command === "drift" ? "3" : "2"} 落位）\n`);
+
+  // `snapshot` / `scan`（M2 落位）：只摊开事实，不做判定，因此**永不因"发现问题"退出 1**。
+  // 它们的退出码只看"事实层算不算得出来"（3）与"一切正常"（0）。
+  if (opts.command === "snapshot") {
+    const snapshot = snapshotAll(root);
+    process.stdout.write(opts.json ? renderJson(snapshot) : renderSnapshot(snapshot));
+    return exitCodeFor(decideSnapshotExit(snapshot));
+  }
+  if (opts.command === "scan") {
+    const scan = scanAll(root);
+    process.stdout.write(opts.json ? renderJson(scan) : renderScan(scan));
+    return exitCodeFor(decideScanExit(scan));
+  }
+  if (opts.command === "drift") {
+    // M3 落位；此刻显式报"尚未实现"，不假装成功
+    process.stderr.write(`${TOOL}: drift 尚未实现（M3 落位）\n`);
     return EXIT.CANNOT_COMPUTE;
   }
 

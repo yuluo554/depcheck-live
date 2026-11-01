@@ -6,14 +6,17 @@
   "verifies": "RESOLVED",
   "source": {
     "packages": ["chalk@6.0.1", "zod@4.6.7", "date-fns@4.4.0", "glob@14.0.3", "commander@15.0.0"],
-    "provenance": "data/packages/*.json（生成器产物，禁手改）",
-    "note": "包必须真实安装后由 bench 复现；本文件的 evidence 字段在 M2 按实际 exports 回填"
+    "provenance": "data/packages/*.json（生成器产物，禁手改）；逐点 evidence 由 M2 按实读 exports 与目标文件行号回填",
+    "note": "包必须真实安装后由 bench 复现；evidence 里的行号是本机 node_modules 实测值，换版本需重测"
   },
   "expect": {
     "exitCode": 0,
     "summary": {
       "problems": 0,
-      "gaps": 0
+      "gaps": 0,
+      "byStatus": {
+        "RESOLVED": 5
+      }
     }
   },
   "points": [
@@ -26,9 +29,12 @@
       "imported": ["default"],
       "status": "RESOLVED",
       "evidence": {
-        "rule": "data/README.md §5.4 #1",
+        "rule": "data/README.md §5.4 #1（条件按键序；default 恒命中）",
+        "exportsSnippet": "\"exports\": { \"types\": \"./source/index.d.ts\", \"default\": \"./source/index.js\" }",
         "exportsPath": ["exports", ".", "default"],
-        "toFillIn": "M2：给出 exports 字段原文片段 + 目标文件里 default 导出的行号"
+        "target": "./source/index.js",
+        "targetEvidence": "node_modules/chalk/source/index.js:262 `export default chalk;`",
+        "why": "import 视角命中 default 分支 → 目标 ./source/index.js；该文件第 262 行确有 default 导出"
       }
     },
     {
@@ -41,8 +47,11 @@
       "status": "RESOLVED",
       "evidence": {
         "rule": "data/README.md §5.2 反面判据（有 require 分支 → 必须 RESOLVED）",
+        "exportsSnippet": "\".\": { \"@zod/source\": \"./src/index.ts\", \"types\": \"./index.d.cts\", \"import\": \"./index.js\", \"require\": \"./index.cjs\" }",
         "exportsPath": ["exports", ".", "require"],
-        "toFillIn": "M2"
+        "target": "./index.cjs",
+        "targetEvidence": "node_modules/zod/index.cjs:31 `exports.z = z;`（并 __exportStar 转发 v4/classic/external.cjs）",
+        "why": "require 视角命中 require 分支 → 真 CJS 产物；导出集含 z。注意 zod 也是 type: module，按 type 判会误判"
       }
     },
     {
@@ -55,8 +64,11 @@
       "status": "RESOLVED",
       "evidence": {
         "rule": "data/README.md §5.2 反面判据",
-        "exportsPath": ["exports", ".", "require"],
-        "toFillIn": "M2"
+        "exportsSnippet": "\".\": { \"require\": { \"types\": \"./index.d.cts\", \"default\": \"./index.cjs\" }, \"import\": { \"types\": \"./index.d.ts\", \"default\": \"./index.js\" } }",
+        "exportsPath": ["exports", ".", "require", "default"],
+        "target": "./index.cjs",
+        "targetEvidence": "node_modules/date-fns/index.cjs → 245 组 `var _indexN = require(\"./x.cjs\"); Object.keys(_indexN).forEach(…)` 桶转发；其中 ./addDays.cjs:2 为 `exports.addDays = addDays;`",
+        "why": "入口是桶文件：只看首层会读出**空导出集**（M2 修前实测 0 个），必须沿相对 require + Object.keys 枚举递归才能拿到 addDays"
       }
     },
     {
@@ -69,8 +81,11 @@
       "status": "RESOLVED",
       "evidence": {
         "rule": "data/README.md §5.2 反面判据",
-        "exportsPath": ["exports", ".", "require"],
-        "toFillIn": "M2"
+        "exportsSnippet": "\".\": { \"import\": { \"types\": \"./dist/esm/index.d.ts\", \"default\": \"./dist/esm/index.min.js\" }, \"require\": { \"types\": \"./dist/commonjs/index.d.ts\", \"default\": \"./dist/commonjs/index.min.js\" } }",
+        "exportsPath": ["exports", ".", "require", "default"],
+        "target": "./dist/commonjs/index.min.js",
+        "targetEvidence": "node_modules/glob/dist/commonjs/index.min.js:2 `exports.globSync=hs`",
+        "why": "目标在 dist/commonjs/ 下，该目录自带 `package.json: {\"type\":\"commonjs\"}`（CJS）。按**包根** type:module 判会把这份 CJS 产物当 ESM 解析 → 导出集读成空（M2 修前实测 0 个）"
       }
     },
     {
@@ -82,9 +97,12 @@
       "imported": ["Command"],
       "status": "RESOLVED",
       "evidence": {
-        "rule": "data/README.md §5.4.1（无 require 分支但具名导出在命名空间上 → 不得判 MISMATCH）",
+        "rule": "data/README.md §5.4.1 反面判据（无 require 分支，但具名符号在命名空间上 → 不得判 MISMATCH）",
+        "exportsSnippet": "\".\": { \"types\": \"./typings/index.d.ts\", \"default\": \"./index.js\" }",
         "exportsPath": ["exports", ".", "default"],
-        "toFillIn": "M2：这条是本 case 最容易被误判成 MISMATCH 的一条"
+        "target": "./index.js",
+        "targetEvidence": "node_modules/commander/index.js:19 `export { Command, Option, Argument, Help };`",
+        "why": "这是本 case 最容易被误判成 MISMATCH 的一条：commander 与 chalk 同为 hasRequireBranch=false，但 Command 在命名空间上（实测 require('commander').Command === function），而 chalk 的 red 在 .default 下"
       }
     }
   ]

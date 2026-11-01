@@ -9,6 +9,7 @@
     "provenance": "本项目合成（plan/04 §6：每种动态形态各一例）",
     "note": "本项目不执行被测代码（plan/00 §2.1），静态解析不到的一律 AMBIGUOUS"
   },
+  "designNote": "M2 实测修正了两处语料设计：(1) 点 4 原写法 `plugins: [pkgName]` 里没有任何加载调用，按本工具'引用点 = 加载调用点'的模型不存在可判对象——现改为经 require() 加载 config 里的运行时值；(2) 配置对象里的**字面量**包名是 plan/03 §3 的合法 string-literal 引用点，会额外产出 RESOLVED，故该点只放变量。",
   "expect": {
     "exitCode": 0,
     "exitCodeRationale": "data/README.md §5.1 硬纪律：仅存在 AMBIGUOUS、无确证问题时退出码为 0，但报告须显式计数",
@@ -23,63 +24,88 @@
     {
       "id": "c5-1",
       "file": "src/dyn-var.cjs",
-      "line": 3,
-      "kind": "ambiguous",
-      "specifier": null,
-      "status": "AMBIGUOUS",
-      "form": "变量间接 require",
-      "evidence": { "rule": "plan/03 §3 判据纪律 1（严禁把解析不到当不存在）", "toFillIn": "M2" }
-    },
-    {
-      "id": "c5-2",
-      "file": "src/dyn-concat.cjs",
-      "line": 2,
-      "kind": "ambiguous",
-      "specifier": null,
-      "status": "AMBIGUOUS",
-      "form": "模板字符串拼接",
-      "evidence": { "rule": "plan/03 §3", "toFillIn": "M2" }
-    },
-    {
-      "id": "c5-3",
-      "file": "src/dyn-import.cjs",
-      "line": 3,
-      "kind": "ambiguous",
-      "specifier": null,
-      "status": "AMBIGUOUS",
-      "form": "动态 import 变量",
-      "evidence": { "rule": "plan/03 §3", "toFillIn": "M2" }
-    },
-    {
-      "id": "c5-4",
-      "file": "src/dyn-config.mjs",
       "line": 4,
       "kind": "ambiguous",
       "specifier": null,
       "status": "AMBIGUOUS",
+      "form": "变量间接 require",
+      "evidence": {
+        "rule": "plan/03 §3 判据纪律 1（严禁把解析不到当不存在）",
+        "sourceLine": "src/dyn-var.cjs:4 `const mod = require(name);`（name 在第 3 行由字符串初始化）",
+        "why": "参数不是字面量 → readCallArgument 分类为「非静态」→ 显式落 AMBIGUOUS。第 3 行的 \"chalk\" 字面量是动态实参的初始化式，兜底不得再计一次（否则同一引用点两种结论）"
+      }
+    },
+    {
+      "id": "c5-2",
+      "file": "src/dyn-concat.cjs",
+      "line": 4,
+      "kind": "ambiguous",
+      "specifier": null,
+      "status": "AMBIGUOUS",
+      "form": "模板字符串拼接（含插值）",
+      "evidence": {
+        "rule": "plan/03 §3",
+        "sourceLine": "src/dyn-concat.cjs:4 ``const mod = require(`chalk/${x}`);``",
+        "why": "含插值的模板串不可静态确定；**不含**插值的模板串（require(`chalk`)）则是静态的，两者必须区分"
+      }
+    },
+    {
+      "id": "c5-3",
+      "file": "src/dyn-import.cjs",
+      "line": 4,
+      "kind": "ambiguous",
+      "specifier": null,
+      "status": "AMBIGUOUS",
+      "form": "动态 import 变量",
+      "evidence": {
+        "rule": "plan/03 §3",
+        "sourceLine": "src/dyn-import.cjs:4 `const m = await import(someVar);`",
+        "why": "与 require 走同一套调用点分类：非字面量实参 → AMBIGUOUS（import 与 require 不得两套口径）"
+      }
+    },
+    {
+      "id": "c5-4",
+      "file": "src/dyn-config.mjs",
+      "line": 9,
+      "kind": "ambiguous",
+      "specifier": null,
+      "status": "AMBIGUOUS",
       "form": "配置对象里的运行时生成值",
-      "evidence": { "rule": "plan/03 §3", "toFillIn": "M2" }
+      "evidence": {
+        "rule": "plan/03 §3",
+        "sourceLine": "src/dyn-config.mjs:9 `const loader = require(config.plugins[0]);`（plugins[0] 来自 process.env.PLUGIN）",
+        "why": "属性访问表达式不可静态确定 → AMBIGUOUS。本条钉住的是'运行时生成'这一形态，配置对象本身不是引用点"
+      }
     },
     {
       "id": "c5-5",
       "file": "src/dyn-prop.cjs",
-      "line": 2,
+      "line": 4,
       "kind": "ambiguous",
       "specifier": null,
       "status": "AMBIGUOUS",
-      "form": "字面量+变量拼接（防'看到引号就当静态'）",
-      "evidence": { "rule": "plan/03 §3", "toFillIn": "M2" }
+      "form": "字面量 + 变量拼接（防『看到引号就当静态』）",
+      "evidence": {
+        "rule": "plan/03 §3",
+        "sourceLine": "src/dyn-prop.cjs:4 `const mod = require(\"chalk\" + suffix);`",
+        "why": "有字面量前缀但整体是二元表达式 → 非静态。本条是 M2 实测发现的整族漏洞：M0 的四条互补正则对 `require(\"chalk\" + suffix)` 全不匹配，会被**静默丢弃**"
+      }
     },
     {
       "id": "c5-6-counterexample",
       "file": "src/static.mjs",
-      "line": 1,
+      "line": 3,
       "kind": "import",
       "specifier": "zod",
       "imported": ["z"],
       "status": "RESOLVED",
-      "whyCounterexample": "静态字面量必须判 RESOLVED；防'全判 AMBIGUOUS'的实现",
-      "evidence": { "rule": "plan/03 §3", "toFillIn": "M2" }
+      "whyCounterexample": "静态字面量必须判 RESOLVED；防『全判 AMBIGUOUS』的实现",
+      "evidence": {
+        "rule": "plan/03 §3",
+        "sourceLine": "src/static.mjs:3 `import { z } from \"zod\";`",
+        "target": "./index.js",
+        "targetEvidence": "node_modules/zod/index.js:7 `export { z, z as default };`"
+      }
     }
   ]
 }

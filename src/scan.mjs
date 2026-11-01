@@ -31,50 +31,99 @@ export function scanText(text, file = "<inline>") {
 
 const STATIC_IMPORT = /(?:^|[\s;{(])import\s+(?:([\w$*{}\s,]+?)\s+from\s+)?(["'])([^"'\n]+)\2/g;
 const EXPORT_FROM = /(?:^|[\s;}])export\s+(?:\*|\{[^}]*\})\s+from\s+(["'])([^"'\n]+)\1/g;
-const REQUIRE_CALL = /\brequire\s*\(\s*(["'])([^"'\n]+)\1\s*\)/g;
 const REQUIRE_DESTRUCTURED = /(?:const|let|var)\s*\{([^}]*)\}\s*=\s*require\s*\(\s*(["'])([^"'\n]+)\2\s*\)/g;
-const REQUIRE_DYNAMIC = /\brequire\s*\(\s*([^"')\s][^)]*)\)/g;
-const DYNAMIC_IMPORT = /\bimport\s*\(\s*(["'])([^"'\n]+)\1\s*\)/g;
-const DYNAMIC_IMPORT_VAR = /\bimport\s*\(\s*([^"')\s][^)]*)\)/g;
 const JEST_MOCK = /\b(?:jest|vi)\s*\.\s*(?:mock|requireActual|importActual|doMock)\s*\(\s*(["'])([^"'\n]+)\1/g;
+/** `require(` / `import(` 的**调用点**（参数内容由 `readCallArgument` 另行切分）。 */
+const CALL_SITE = /\b(require|import)\s*\(/g;
+/** 纯字面量参数：单/双引号，或**不含插值**的模板串（`` `chalk` `` 是静态的，`` `./${x}` `` 不是）。 */
+const STATIC_ARG = /^(?:"([^"\n]+)"|'([^'\n]+)'|`([^`$\n]+)`)$/;
 
 function scanLine(line, file, lineNo) {
-  const out = [];
+  const found = []; // {pos, point} —— 在同一行内按出现位置排序后再输出
 
   // ① import ... from "x" / import "x"
   for (const m of line.matchAll(STATIC_IMPORT)) {
-    out.push({ file, line: lineNo, kind: "import", specifier: m[3], imported: parseImportClause(m[1]) });
+    found.push({ pos: m.index, point: { file, line: lineNo, kind: "import", specifier: m[3], imported: parseImportClause(m[1]) } });
   }
   // ② export ... from "x"
   for (const m of line.matchAll(EXPORT_FROM)) {
-    out.push({ file, line: lineNo, kind: "export-from", specifier: m[2], imported: ["*"] });
+    found.push({ pos: m.index, point: { file, line: lineNo, kind: "export-from", specifier: m[2], imported: ["*"] } });
   }
-  // ③ require("x")——解构形态额外记下被取用的符号（判定 §5.2 第 4 条要用）
+
+  // ③ require(...) / import(...) —— **一个调用点必定产出一个引用点**。
+  //
+  // 这里不再用"静态字面量正则 + 动态兜底正则"两条互补规则，而是先定位调用点、
+  // 再对参数**分类**。原因（M2 实测）：互补正则合起来并不构成全覆盖，`
+  // require("chalk" + suffix)`、`require("./" + x)`、`import("chalk" + s)`
+  // 三条都同时落进两条正则的空隙，被**静默丢弃**——那正是本文件头部纪律明令禁止的
+  // "把解析不到当不存在"。分类法对任何一种参数形态都只会落进两个桶之一：
+  //   静态（可确定的字面量）→ kind = require / dynamic-import
+  //   其余（变量、拼接、插值模板、表达式）→ kind = ambiguous，**显式出现在结果里**
+  //
+  // 解构形态额外记下被取用的符号（判定 §5.2 第 4 条要用）。键 = 调用点自身的下标，
+  // 不是整条 `const {…} = require(…)` 的起始下标（`REQUIRE_DESTRUCTURED` 从 `const` 起匹配，
+  // 两者相差 `"const {…} = "` 那一段；早期版本直接拿 `m.index` 当键，导致 `imported` 恒为空，
+  // 判定层读成"只加载包、不取符号"，把 C2/C3 的红条目全判绿）。
   const destructured = new Map();
   for (const m of line.matchAll(REQUIRE_DESTRUCTURED)) {
-    destructured.set(m.index, parseDestructuredNames(m[1]));
+    destructured.set(m.index + m[0].indexOf("require"), parseDestructuredNames(m[1]));
   }
-  for (const m of line.matchAll(REQUIRE_CALL)) {
-    const names = destructured.get(m.index) ?? [];
-    out.push({ file, line: lineNo, kind: "require", specifier: m[2], imported: names });
+  for (const m of line.matchAll(CALL_SITE)) {
+    const callee = m[1];
+    const arg = readCallArgument(line, m.index + m[0].length - 1);
+    if (arg === null) {
+      // 参数没闭合（跨行调用）：不能确定就显式记 ambiguous，不丢
+      found.push({ pos: m.index, point: { file, line: lineNo, kind: "ambiguous", specifier: null, imported: [], note: `${callee}(…跨行…)` } });
+      continue;
+    }
+    const trimmed = arg.text.trim();
+    const staticMatch = STATIC_ARG.exec(trimmed);
+    if (staticMatch) {
+      const specifier = staticMatch[1] ?? staticMatch[2] ?? staticMatch[3];
+      if (callee === "require") {
+        found.push({ pos: m.index, point: { file, line: lineNo, kind: "require", specifier, imported: destructured.get(m.index) ?? [] } });
+      } else {
+        found.push({ pos: m.index, point: { file, line: lineNo, kind: "dynamic-import", specifier, imported: ["*"] } });
+      }
+      continue;
+    }
+    found.push({ pos: m.index, point: { file, line: lineNo, kind: "ambiguous", specifier: null, imported: [], note: `${callee}(${truncate(trimmed)})` } });
   }
-  // ④ require(variable) → AMBIGUOUS（显式，不可丢）
-  for (const m of line.matchAll(REQUIRE_DYNAMIC)) {
-    out.push({ file, line: lineNo, kind: "ambiguous", specifier: null, imported: [], note: `require(${truncate(m[1])})` });
-  }
-  // ⑤ import("x")
-  for (const m of line.matchAll(DYNAMIC_IMPORT)) {
-    out.push({ file, line: lineNo, kind: "dynamic-import", specifier: m[2], imported: ["*"] });
-  }
-  // ⑥ import(variable) → AMBIGUOUS
-  for (const m of line.matchAll(DYNAMIC_IMPORT_VAR)) {
-    out.push({ file, line: lineNo, kind: "ambiguous", specifier: null, imported: [], note: `import(${truncate(m[1])})` });
-  }
-  // ⑦ jest.mock("x")
+
+  // ④ jest.mock("x")
   for (const m of line.matchAll(JEST_MOCK)) {
-    out.push({ file, line: lineNo, kind: "jest-mock", specifier: m[2], imported: [] });
+    found.push({ pos: m.index, point: { file, line: lineNo, kind: "jest-mock", specifier: m[2], imported: [] } });
   }
-  return out;
+
+  found.sort((a, b) => a.pos - b.pos); // 同行内按出现位置（确定性）
+  return found.map((f) => f.point);
+}
+
+/**
+ * 从 `(` 的下标开始切出一对括号之间的参数文本（不递归解析语法，只做配平 + 跳过字符串）。
+ * 返回 `{text}`；同一行内找不到闭合括号时返回 `null`（调用点跨行或写法极端）。
+ */
+function readCallArgument(line, openIndex) {
+  let depth = 0;
+  let quote = null;
+  for (let i = openIndex; i < line.length; i++) {
+    const ch = line[i];
+    if (quote !== null) {
+      if (ch === "\\") i++;
+      else if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      quote = ch;
+      continue;
+    }
+    if (ch === "(") depth++;
+    else if (ch === ")") {
+      depth--;
+      if (depth === 0) return { text: line.slice(openIndex + 1, i) };
+    }
+  }
+  return null;
 }
 
 function truncate(s, n = 40) {
@@ -138,8 +187,33 @@ export function findBarePackageLiterals(text, depNames) {
   const out = [];
   if (!depNames || depNames.size === 0) return out;
   const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+  // 被当作动态 specifier 用过的标识符（`require(name)` / `import(name)`）：
+  // 它们的**声明右值**已经由调用点扫描器判成 `AMBIGUOUS`，兜底不得再计一次。
+  // 反例（M2 实测）：`const name = "chalk"; require(name)` 会让第 2 行同时出现
+  // AMBIGUOUS（调用点）与 RESOLVED "chalk"（初始化表达式）——同一个引用点两种结论。
+  const dynamicIdents = new Set();
+  for (const line of lines) {
+    for (const m of line.matchAll(CALL_SITE)) {
+      const arg = readCallArgument(line, m.index + m[0].length - 1);
+      const text = arg?.text.trim();
+      if (!text) continue;
+      if (STATIC_ARG.test(text)) continue; // 静态字面量：没有参与拼装的标识符
+      // 非静态参数：参数里出现的每个标识符都可能参与拼装 specifier
+      // （`require(name)`、`` require(`chalk/${x}`) ``、`require("chalk" + suffix)`）
+      for (const id of text.matchAll(/[A-Za-z_$][\w$]*/g)) dynamicIdents.add(id[0]);
+    }
+  }
   for (let i = 0; i < lines.length; i++) {
+    const callArgSpans = callArgumentSpans(lines[i]);
     for (const m of lines[i].matchAll(ANY_STRING_LITERAL)) {
+      // 落在 `require(…)` / `import(…)` 参数区里的字面量归**调用点扫描器**管，
+      // 兜底不得再计一次。反例（M2 实测）：`require("chalk" + suffix)` 的字面量前缀
+      // 若被兜底计成 `chalk` 引用点，同一行会同时出现 RESOLVED 与 AMBIGUOUS ——
+      // 等于对用户说了两句话，其中一句是"没问题"。参数区内的可确定性由调用点负责。
+      if (callArgSpans.some(([from, to]) => m.index >= from && m.index < to)) continue;
+      // 声明右值且标识符已被用作动态 specifier → 同上，已由调用点覆盖
+      const decl = /^\s*(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=/.exec(lines[i]);
+      if (decl && dynamicIdents.has(decl[1]) && m.index >= lines[i].indexOf("=")) continue;
       const raw = m[2].trim();
       if (!BARE_PACKAGE_NAME.test(raw)) continue;
       const namePart = raw.startsWith("@") ? raw.split("/").slice(0, 2).join("/") : raw.split("/")[0];
@@ -148,6 +222,19 @@ export function findBarePackageLiterals(text, depNames) {
     }
   }
   return out;
+}
+
+/** 一行里所有 `require(` / `import(` 的参数区 `[from, to)`（按 `readCallArgument` 同一口径切分）。 */
+function callArgumentSpans(line) {
+  const spans = [];
+  for (const m of line.matchAll(CALL_SITE)) {
+    const open = m.index + m[0].length - 1;
+    const arg = readCallArgument(line, open);
+    // 参数没闭合（跨行）时保守地取到行尾
+    const end = arg === null ? line.length : open + 1 + arg.text.length + 1;
+    spans.push([open + 1, end]);
+  }
+  return spans;
 }
 
 /**

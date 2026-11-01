@@ -9,10 +9,18 @@
 
 | 引用点 | 包 | 写法 | 为什么必然缺席 |
 |---|---|---|---|
-| 1 | `chalk@6.0.1` | `const { notARealExport } = require("chalk")` | 该名字不存在于 `chalk` 的任何产物 |
+| 1 | `chalk@6.0.1` | `import { notARealExport } from "chalk"` | 该名字不存在于 `chalk` 的任何产物 |
 | 2 | `zod@4.6.7` | `import { notARealExport } from "zod"` | 同上 |
-| 3 | `date-fns@4.4.0` | `import { notARealExport } from "date-fns"` | 同上 |
+| 3 | `date-fns@4.4.0` | `import { notARealExport } from "date-fns"` | 同上（入口是 245 行 re-export 桶，展开后 251 个名字里也没有它） |
 | 4（反例） | `chalk@6.0.1` | `const { red } = require("chalk")` | `red` **存在于 `.default` 下**，但不在 CJS 命名空间上 |
+
+> ⚠️ **M2 修正了一处构造**：M1 骨架把点 1–3 写成 `const { notARealExport } = require("chalk")`。
+> 那条在 `chalk` 这类**无 `require` 分支**的包上**永远到不了** `MISSING-EXPORT`——
+> 判定顺序（`plan/03` §4.4）里 `ESM-CJS-MISMATCH` 在 `MISSING-EXPORT` 之前，首个成立者胜。
+> 这不是实现缺陷，是该形态的固有结果。故点 1–3 改为 **ESM 视角**（`import`）构造，
+> CJS 侧的专属形态留给点 4，它验证的是**判定顺序**本身。
+>
+> 对应源码：`src/chalk.mjs` / `src/zod.mjs` / `src/date-fns.mjs` / `src/chalk.cjs`。
 
 ## 为什么这条构造能证伪
 
@@ -39,4 +47,5 @@
 退出码 `1`；点 1–3 为 `MISSING-EXPORT`（`missing` 数组各含 `"notARealExport"`）；
 点 4 为 `ESM-CJS-MISMATCH`（**不是** `MISSING-EXPORT`）；`summary.problems === 4`。
 
-> **M1 状态**：`INPUT.md` 已定稿；`expected.json` 的逐点 `evidence` 待 M2 补齐。
+> **M2 状态**：`expected.json` 的逐点 `evidence` 已按实读 `exports` 原文片段 + 目标文件行号回填
+> （无 `toFillIn` 残留）；`src/` 与 `package.json` 已在 M2 落地，`tests/fixtures-run.test.mjs` 逐点对账。

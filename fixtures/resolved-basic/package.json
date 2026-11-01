@@ -1,0 +1,13 @@
+{
+  "name": "c1-resolved-basic",
+  "version": "0.0.0",
+  "private": true,
+  "description": "C1 语料：五个真实包的引用点全部 RESOLVED",
+  "dependencies": {
+    "chalk": "^6.0.1",
+    "commander": "^15.0.0",
+    "date-fns": "^4.4.0",
+    "glob": "^14.0.3",
+    "zod": "^4.6.7"
+  }
+}
