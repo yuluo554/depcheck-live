@@ -9,8 +9,8 @@
 | 00 | `plan/00-README总览.md` | ✅ 本文件 |
 | 01 | `plan/01-题目文档.md` | ✅ 定稿 v1 |
 | 02 | `plan/02-架构与技术选型.md` | ✅ M0 |
-| 03 | `plan/03-模块详设.md` | ✅ M2（模块 ①②③ 已回填实测口径；④⑤ 待 M3/M4） |
-| 04 | `plan/04-数据计划.md` | ✅ M2（语料 C1–C5 已落地并逐点对账；C6/C7 待 M3/M4） |
+| 03 | `plan/03-模块详设.md` | ✅ M3（模块 ①②③ 已回填实测口径；④ `drift` 已落位；⑤ 报告待 M4） |
+| 04 | `plan/04-数据计划.md` | ✅ M3（语料 C1–C6 已落地并逐点对账；C7 待 M4） |
 | 05 | `plan/05-里程碑与发布.md` | ✅ M0 |
 | 06 | `plan/06-交付对标与决策.md` | ✅ M0 |
 | — | `data/README.md` | ✅ 依据查证 + 口径唯一定义 |
@@ -50,12 +50,12 @@
 
 | 承诺项 | 素材来源 | 交付物内可达性 | 核验方式 | 状态 |
 |---|---|---|---|---|
-| `RESOLVED` 判定 | 真实 `node_modules/*/package.json` | ✅ 只读本地文件 | `bench` 正例集（M0 已有真实包冒烟） | ⬜ 待 M3 |
-| `MISSING-EXPORT` 判定 | 同上 + 导出集解析 | ✅ | `bench` 反例集 | ⬜ 待 M3 |
-| `ESM-CJS-MISMATCH` 判定 | `exports.require` 分支存在性 | ✅ | `bench` 对照组（chalk vs zod/glob） | ⬜ 待 M3 |
-| `NOT-EXPORTED-SUBPATH` 判定 | `exports` 子路径屏蔽 | ✅ | `bench`（chalk/commander 的 `./package.json`） | ⬜ 待 M3 |
-| `AMBIGUOUS` 判定 | 动态形态识别 | ✅ | `bench` 动态样例 | ⬜ 待 M3 |
-| `VERSION-BEHAVIOR-DRIFT` 判定 | 离线指纹包 | ✅ | `bench` 离线指纹集 | ⬜ 待 M3 |
+| `RESOLVED` 判定 | 真实 `node_modules/*/package.json` | ✅ 只读本地文件 | `bench` 正例集（C1 resolved-basic） | ✅ M3 |
+| `MISSING-EXPORT` 判定 | 同上 + 导出集解析 | ✅ | `bench` 反例集（C2 missing-export） | ✅ M3 |
+| `ESM-CJS-MISMATCH` 判定 | `exports.require` 分支存在性 | ✅ | `bench` 对照组（C3 chalk vs zod/date-fns/commander/glob） | ✅ M3 |
+| `NOT-EXPORTED-SUBPATH` 判定 | `exports` 子路径屏蔽 | ✅ | `bench`（C4，chalk/commander 的 `./package.json`） | ✅ M3 |
+| `AMBIGUOUS` 判定 | 动态形态识别 | ✅ | `bench` 动态样例（C5） | ✅ M3 |
+| `VERSION-BEHAVIOR-DRIFT` 判定 | 离线指纹包 | ✅ | `bench` + C6 逐点对账（离线基线 `data/fingerprints/`） | ✅ M3 |
 | 退出码语义可分 | `data/README.md` §5 | ✅ | `tests/cli.test.mjs` 断言 | ⬜ 待 M4 |
 | 干净工程零误报 | 合成干净语料 | ✅ | `bench --clean` | ⬜ 待 M4 |
 | Skill 契约块双向一致 | `SKILL.md` ↔ `src/contract.mjs` | ✅ | `tests/contract.test.mjs` | ⬜ 待 M5 |
@@ -75,7 +75,7 @@
 | M0 | 计划套件 + 方法论装订 + 可运行骨架（CLI 参数面 + 模块接口 + 两道门） | ✅ 已完成 |
 | M1 | 数据先行：`exports` 六形态语义核对入 `data/README` §5、五包对照组指纹与六份语料定稿 | ✅ 已完成 |
 | M2 | 解析层：`exports` 解析器 + 引用点抽取器 + `fixtures/` 落地（含 `snapshot` / `scan` 命令） | ✅ 已完成 |
-| M3 | 判定层：五个判定态 + `drift`（离线指纹） | ⬜ 待 M3 |
+| M3 | 判定层：五个判定态 + `drift`（离线基线）+ `bench` | ✅ 已完成 |
 | M4 | 基准：`bench` / `selftest` / 退出码断言 / 干净零误报集 | ⬜ 待 M4 |
 | M5 | 交付：CLI 完整面 + `SKILL.md`（契约块双向断言）+ 技术报告 + demo GIF | ⬜ 待 M5 |
 | M6 | 发布：脱敏 + 干净环境验证 + 建仓 + CI 首跑 + tag + Release | ⬜ 待 M6 |
@@ -109,8 +109,8 @@
 | 架构选型 | `plan/02-架构与技术选型.md` | M0 | `git ls-files` |
 | 模块详设 | `plan/03-模块详设.md` | M0 | `git ls-files` |
 | 数据计划 | `plan/04-数据计划.md` | M0 | `git ls-files` |
-| 基准语料 | `fixtures/*/INPUT.md` + `expected.json` + `src/` | ✅ M2（C1–C5；C6 属 M3、C7 属 M4） | `git ls-files fixtures/` |
-| 自测与基准 | `tests/` + `selftest`/`bench` 命令 | M3/M4 | `npm test && node bin/depcheck-live.mjs bench` |
+| 基准语料 | `fixtures/*/INPUT.md` + `expected.json` + `src/` | ✅ M3（C1–C6；C7 属 M4） | `git ls-files fixtures/` |
+| 自测与基准 | `tests/` + `selftest`/`bench` 命令 | `bench` ✅ M3 / `selftest` M4 | `npm test && node bin/depcheck-live.mjs bench` |
 | Agent Skill | `SKILL.md` | M5 | `git ls-files SKILL.md` |
 | 技术报告 | `docs/技术报告.md` | M5 | `git ls-files docs/` |
 | 演示产物 | `docs/demo/demo.gif` | M5 | `git ls-files docs/demo/` |

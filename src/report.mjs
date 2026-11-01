@@ -78,6 +78,36 @@ export function renderSnapshot(snapshot) {
   return `${lines.join("\n")}\n`;
 }
 
+/** `drift` 人读：逐引用点一行。`NO-BASELINE` 显式进"算不了"段，不混进"问题"。 */
+export function renderDrift(drift) {
+  const lines = [];
+  if (!drift.ok) {
+    lines.push(`${TOOL}: 无法计算（${drift.reason}）`);
+    return `${lines.join("\n")}\n`;
+  }
+  const s = drift.summary;
+  lines.push(`${TOOL} drift · 引用点 ${s.totalPoints} 个 · 漂移 ${s.problems} · 算不了 ${s.gaps}`);
+  if (drift.findings.length > 0) {
+    lines.push("");
+    lines.push("漂移：");
+    for (const f of drift.findings) {
+      const where = f.line ? `${f.file}:${f.line}` : f.file;
+      lines.push(`  ${f.status} [${f.pkg}] ${where} 缺 ${(f.missing ?? []).join(",")}`);
+      lines.push(`    ${f.detail}`);
+      if (f.rule) lines.push(`    判据: ${f.rule}`);
+    }
+  }
+  if (drift.gaps.length > 0) {
+    lines.push("");
+    lines.push("算不了（计入覆盖缺口，不代表代码有错）：");
+    for (const g of drift.gaps) {
+      const where = g.file ? ` ${g.file}${g.line ? `:${g.line}` : ""}` : "";
+      lines.push(`  ${g.kind}${g.pkg ? ` [${g.pkg}]` : ""}${where} ${g.detail ?? ""}`.trimEnd());
+    }
+  }
+  return `${lines.join("\n")}\n`;
+}
+
 /** `scan` 人读：逐引用点一行（`AMBIGUOUS` 显式列出，不静默）。 */
 export function renderScan(scan) {
   const lines = [`${TOOL} scan · 源码 ${scan.files.length} 个文件 · 引用点 ${scan.points.length} 个`];

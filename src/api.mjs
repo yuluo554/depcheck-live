@@ -49,9 +49,21 @@ export function checkAll(root, options = {}) {
   }
 
   if (options.withDrift) {
-    for (const d of driftAll(project, options.drift ?? {})) {
-      if (d.status === DRIFT) findings.push(d);
-      else if (d.status === NO_BASELINE) gaps.push({ kind: NO_BASELINE, pkg: d.pkg, detail: d.detail });
+    // drift 按**引用点**判（不是按包）：同一个包里"老符号没了"与"老符号还在"必须给出两种结论。
+    // `driftPoints` 只保留有结论的点——不在 drift 判定面内的点不制造噪音。
+    for (const d of driftAll(deps, scan.points, options.drift ?? {})) {
+      if (d.status === DRIFT) {
+        // ★ 漂移是同一引用点上**更精确**的诊断，就地取代较粗的那条（通常是 MISSING-EXPORT）。
+        //   不取代的后果：一个引用点产出两条 problem，`summary.problems` 被算两遍，
+        //   "1 个问题"读成"2 个问题"——计数级失真，`plan/04` §6 的覆盖度口径就不可信了。
+        //   判定顺序里 drift 不是第六态，它是"为什么缺"的解释层，所以取代而非追加。
+        const key = `${d.file}|${d.line}|${d.specifier ?? ""}`;
+        const at = findings.findIndex((f) => `${f.file}|${f.line}|${f.specifier ?? ""}` === key);
+        if (at >= 0) findings.splice(at, 1);
+        findings.push(d);
+      } else if (d.status === NO_BASELINE) {
+        gaps.push({ kind: NO_BASELINE, pkg: d.pkg, file: d.file, line: d.line, specifier: d.specifier, detail: d.detail });
+      }
     }
   }
 
@@ -153,6 +165,70 @@ export function decideExit(result) {
   ).length;
   if (hardProblems > 0) return "PROBLEMS";
   // 有 gaps（含 UNPARSEABLE / NO_BASELINE / 未安装依赖）但无确证问题 → 算不了
+  if (result.gaps.length > 0) return "CANNOT_COMPUTE";
+  return "OK";
+}
+
+/**
+ * `drift` 主流程：只做漂移判定，不做五判定态（那是 `check` 的事）。
+ *
+ * 与 `check --with-drift` **共用**同一个 `judgeDriftPoint`——两个入口对同一个包不许给出不同结论。
+ *
+ * @returns {{ ok:boolean, reason?:string, summary:object, findings:Array, gaps:Array }}
+ */
+export function driftCommand(root, options = {}) {
+  const project = readProject(root);
+  if (!project.ok) {
+    return { ok: false, reason: project.reason, summary: driftSummary([], []), findings: [], gaps: [] };
+  }
+  const deps = new Map();
+  for (const record of project.directDeps) {
+    deps.set(record.name, record);
+    record.index = indexFor(record, root);
+  }
+  const scan = scanSources(root, { ...(options.scan ?? {}), depNames: new Set(deps.keys()) });
+  const baselineDir = options.baselineDir ?? join(root, "data", "fingerprints");
+
+  const findings = [];
+  const gaps = [...project.gaps];
+  for (const d of driftAll(deps, scan.points, { ...(options.drift ?? {}), baselineDir })) {
+    if (d.status === DRIFT) findings.push(d);
+    else if (d.status === NO_BASELINE) gaps.push({ kind: NO_BASELINE, pkg: d.pkg, file: d.file, line: d.line, specifier: d.specifier, detail: d.detail });
+  }
+
+  return {
+    ok: true,
+    summary: driftSummary(findings, gaps, scan.points),
+    findings: sortFindings(findings),
+    gaps: sortGaps(gaps),
+  };
+}
+
+function driftSummary(findings, gaps, points = []) {
+  const byStatus = {};
+  for (const f of findings) byStatus[f.status] = (byStatus[f.status] ?? 0) + 1;
+  return {
+    totalPoints: points.length,
+    resolved: 0,
+    ambiguous: 0,
+    problems: findings.filter((f) => f.status === DRIFT).length,
+    gaps: gaps.length,
+    byStatus: sortedObject(byStatus),
+  };
+}
+
+/**
+ * `drift` 的退出码：与 `check` **同一条口径**（`data/README.md` §5.1）。
+ * 有 DRIFT → 1；只有 NO-BASELINE（基准缺失）→ 3；都没有 → 0。
+ *
+ * 为什么 NO-BASELINE 记 3 而不是 0：这是"这一层没跑"与"跑了没问题"的分界
+ * （`bin/depcheck-live.mjs` 顶部纪律 + `plan/05` §4 U 项）。用户显式跑了 `drift`，
+ * 却因为没有基线而什么都没比，回 0 等于把"没跑"写成"跑了没问题"。
+ */
+export function decideDriftExit(result) {
+  if (!result.ok) return "CANNOT_COMPUTE";
+  const hard = result.findings.filter((f) => f.status === DRIFT).length;
+  if (hard > 0) return "PROBLEMS";
   if (result.gaps.length > 0) return "CANNOT_COMPUTE";
   return "OK";
 }

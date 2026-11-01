@@ -15,13 +15,15 @@ const USAGE = `用法: ${TOOL} <命令> [选项] [路径]
   check <path>      判定源码引用点是否对得上已装依赖（主命令）
   snapshot <path>   只输出依赖面快照
   scan <path>       只输出引用点
-  drift <path>      版本行为漂移（需离线指纹）
+  drift <path>      版本行为漂移（需离线基线）
   selftest          自检（M4 落位）
-  bench             基准（M3/M4 落位）
+  bench             基准（M3 落位）
 
 选项:
   --json            机读输出
   --with-drift      在 check 中一并做 drift 判定
+  --baseline-dir <路径>
+                    drift 的离线基线目录（默认: <工程根>/data/fingerprints）
   --version         打印版本
   --help            打印本帮助
 
@@ -30,12 +32,18 @@ const USAGE = `用法: ${TOOL} <命令> [选项] [路径]
 
 /** 解析 argv（不含 node 与脚本路径）。返回 `{ok, opts, error}`，永不抛。 */
 export function parseArgv(argv) {
-  const opts = { json: false, withDrift: false, version: false, help: false, command: null, path: null };
+  const opts = { json: false, withDrift: false, version: false, help: false, command: null, path: null, baselineDir: null };
   const rest = [];
-  for (const arg of argv) {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
     if (arg === "--json") opts.json = true;
     else if (arg === "--with-drift") opts.withDrift = true;
-    else if (arg === "--version" || arg === "-v") opts.version = true;
+    else if (arg === "--baseline-dir") {
+      const next = argv[i + 1];
+      if (!next || next.startsWith("-")) return { ok: false, opts, error: "--baseline-dir 需要参数" };
+      opts.baselineDir = next;
+      i += 1;
+    } else if (arg === "--version" || arg === "-v") opts.version = true;
     else if (arg === "--help" || arg === "-h") opts.help = true;
     else if (arg.startsWith("-")) return { ok: false, opts, error: `未知选项: ${arg}` };
     else rest.push(arg);

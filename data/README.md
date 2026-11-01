@@ -111,6 +111,14 @@ false
 > **硬纪律**：`AMBIGUOUS` **不单独占用退出码**，它随 `1` 输出；
 > 但"仅存在 `AMBIGUOUS`、无确证问题"时退出码为 `0`，并在报告里**显式列出** `AMBIGUOUS` 计数。
 > **"零命中"与"算不了"必须落在不同退出码**（`0` vs `3`）。
+>
+> ⚠️ **`NO-BASELINE` 单独一条口径（M3 裁定）**：它**不算"发现问题"**（不进 `problems`），
+> 但它**落在退出码 `3`**——因为 `3` 的触发条件里就写着"基准缺失"（上表）。
+> 用户显式跑了 `drift`（或 `check --with-drift`）却因缺基线什么都没比成，回 `0` 等于把
+> "这一层没跑"写成"跑了没问题"。**不许**把它读成 `0`。
+> 判据实现：`src/api.mjs` 的 `decideExit` / `decideDriftExit`；C6 真值
+> `fixtures/drift-baseline/expected.json` 的 `exitCodeWhenOnlyNoBaseline = 3`。
+> （`plan/03` §5 旧措辞"不影响退出码"已于 M3 纠正——那条是结构描述，数值以本节为准。）
 
 ### 5.2 `ESM-CJS-MISMATCH` 判据（精确口径）
 
@@ -223,3 +231,40 @@ false
 CJS 视角只用于构造 `ESM-CJS-MISMATCH` 的正例（见 `fixtures/missing-export/`）。
 `M3` 的 `bench` 与 `SKILL.md` 契约块在描述判定能力时，必须体现这条边界，**不得**宣称
 "CJS 视角取错名字会报 MISSING-EXPORT"。
+---
+
+### 5.5 ★ `drift` 判据（M3 落位，唯一定义）
+
+`drift` 回答的是"代码写的老 API 在**装的那个版本**上还在不在"。三条口径全文如下，
+**改它们会让 C6 立刻变红**（`fixtures/drift-baseline/`）：
+
+1. **只在有离线基线时判定。** 基线 = `data/fingerprints/<pkg>.json`，由
+   `tools/gen-baselines.mjs` 从**真实历史版本包**生成（带 `provenance.sha512`，可独立复算）。
+   没有基线 → `NO-BASELINE` 进 gaps，**不猜**（退出码见 §5.1 的 `NO-BASELINE` 单条口径）。
+
+2. **判据是符号行为，不是 semver 字符串。** 判定式：
+   > 该引用点引用的符号 ∈ 基线版本的导出面，且 ∉ 已装版本的导出面 → `VERSION-BEHAVIOR-DRIFT`。
+   版本号跨了 major 但符号仍在 → `RESOLVED`。**不得**因为"版本号不匹配声明 range"就报漂移。
+
+3. **判定单位是引用点，不是整包。** 禁止"这个包的 `exports` 变了就报漂移"。
+   两条实测反例（2026-11-01，本机 Node v24.15.0）：
+   - `date-fns` 3.6.0 → 4.4.0：`.` 导出面 **251 个名字一个不少**，只新增 134 个子路径键。
+     整份 `exports` 指纹必然不同 → 按包比指纹是**系统性假阳性**；
+   - `zod` 4.6.7 移除了 `ZodSchema` / `ZodEffects` / `ZodBranded` 等 31 个符号，
+     但同一包里 `z` / `ZodError` 仍在 → 按包比会把"用的是还在的符号"也判红。
+   逐点判才判得出 C6 的"1 红 1 绿"。（真实 `require` 独立复核：
+   `'ZodSchema' in zod3 === true` / `'ZodSchema' in zod4 === false`。）
+
+**基线文件形状**（生成器产物，禁手改）：`name` / `baselineVersion` / `type` / `canonical` /
+`fingerprint` / `provenance{tarball,tarballFile,sha512,fetchedAt}` / `skippedPatternKeys` /
+`surfaces{ "<子路径>": { import: string[]|null, require: string[]|null } }`。
+
+- `null` = 该视角导出面**读不出**（不是"没有导出"）→ 该点记 `NO-BASELINE`，不猜；
+- 通配键（`./a/*`）**不展开**入仓——判定单位是代码实际写的那个具体子路径；
+- `--check` 判据 = `fingerprint === sha12(canonical)`，**离线可复算**，不必重取 tarball。
+
+> **C6 载体说明**：M1 骨架把 C6 写成 date-fns 3.x→4.x"旧 API 已删"，M3 实测**推翻**
+> （该包只加不减）。M3 改用 `zod@3.25.76 → 4.6.7` 作 DRIFT 正例，date-fns 留在
+> "无基线"一侧。改的**不是**实现去凑真值，是真值本身错了——按 `plan/04` §3 第 3 条，
+> 已同轮改 `data/README` 本节 + `fixtures/drift-baseline/expected.json` +
+> `fixtures/drift-baseline/INPUT.md` 三处。

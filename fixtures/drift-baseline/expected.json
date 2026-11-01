@@ -4,19 +4,31 @@
   "name": "drift-baseline",
   "milestone": "M3",
   "verifies": ["VERSION-BEHAVIOR-DRIFT", "NO-BASELINE"],
+  "designNote": "M3 实测修正：M1 骨架把载体写成 date-fns 3.x→4.x『旧 API 已删』，但 2026-11-01 实测 date-fns 3.6.0→4.4.0 的 `.` 导出面 251 个名字一个不少（只新增 134 个子路径键），DRIFT 正例在该包上不成立。M3 改用 zod 3.25.76→4.6.7 作正例载体：实测移除 31 个符号（ZodSchema / ZodEffects / ZodBranded …），并用真实 require 独立复核。date-fns 保留在点 3 作『无基线』一侧——它恰好证明『没基线所以不猜』与『有基线但没漂移』是两件事。",
   "source": {
-    "packages": ["date-fns@4.4.0"],
-    "historicalFingerprints": "用户显式提供的离线包 → data/fingerprints/（M3 落位，M1 不入仓）",
-    "provenance": "data/packages/date-fns.json 为『新版本』一侧真值；旧版本一侧必须由离线包提供，不得伪造",
-    "note": "本文件在 M1 只定义判定形状；具体版本号与 evidence 由 M3 用离线包填充"
+    "packages": ["zod@3.25.76(基线) → 4.6.7(已装)", "date-fns@3.0.0(声明) → 4.4.0(已装)"],
+    "baselineFile": "data/fingerprints/zod.json",
+    "baselineProvenance": {
+      "tarball": "npm:zod@3.25.76",
+      "sha512Recorded": true,
+      "fetchedAt": "2026-11-01",
+      "howToReproduce": "npm pack zod@3.25.76 → 解包 → node tools/gen-baselines.mjs --add --pkg zod --dir <解出的 package/> --tarball <tgz>；再跑 --check 断言指纹可由 canonical 离线复算"
+    },
+    "provenance": "点 1 的『基线有』来自 data/fingerprints/zod.json（真实写出的 3.25.76 导出面）；『已装没有』可由 data/packages/zod.json 与 node_modules/zod 独立复算",
+    "note": "历史指纹不是编的：tarball 的 sha512 记在基线文件的 provenance 里，任何人可取同一个 tarball 复算"
   },
   "expect": {
-    "exitCodeWhenOnlyNoBaseline": 0,
+    "exitCodeWhenOnlyNoBaseline": 3,
     "exitCodeWhenDrift": 1,
     "summary": {
+      "problems": 1,
+      "gaps": 1,
+      "byStatus": { "VERSION-BEHAVIOR-DRIFT": 1, "RESOLVED": 2 },
       "problemsCountsDrift": true,
       "noBaselineCountsProblems": false,
-      "noBaselineGoesTo": "gaps"
+      "noBaselineGoesTo": "gaps",
+      "noBaselineExitCode": 3,
+      "whyExitCodeIsThree": "data/README.md §5.1：退出码 3 的触发含『基准缺失』。用户显式跑了判定却什么都没比成，回 0 等于把『没跑』写成『跑了没问题』（AGENTS.md §四 禁止）"
     }
   },
   "points": [
@@ -24,39 +36,65 @@
       "id": "c6-1-drift",
       "file": "src/uses-old-api.mjs",
       "line": 2,
-      "declaredRange": "^3.0.0",
-      "installedVersion": "4.4.0",
+      "kind": "import",
+      "specifier": "zod",
+      "imported": ["ZodSchema"],
+      "declaredRange": "^3.25.76",
+      "installedVersion": "4.6.7",
+      "baselineVersion": "3.25.76",
       "hasOfflineFingerprint": true,
       "symbolPresentInOld": true,
       "symbolPresentInInstalled": false,
       "status": "VERSION-BEHAVIOR-DRIFT",
-      "evidence": { "rule": "plan/03 §5（只在有离线指纹时判定）", "toFillIn": "M3" }
+      "evidence": {
+        "rule": "plan/03 §5（只在有离线指纹时判定）+ data/README.md §5.5",
+        "baselineEvidence": "data/fingerprints/zod.json 的 surfaces[\".\"].import 含 ZodSchema",
+        "installedEvidence": "node_modules/zod 的 . 导出面（730 个名字）不含 ZodSchema",
+        "independentRecheck": "node -e \"const a=require('./zod3/index.js'),b=require('./node_modules/zod'); console.log('ZodSchema' in a, 'ZodSchema' in b)\" → true false"
+      }
     },
     {
       "id": "c6-2-still-present",
       "file": "src/uses-stable-api.mjs",
       "line": 2,
-      "declaredRange": "^3.0.0",
-      "installedVersion": "4.4.0",
+      "kind": "import",
+      "specifier": "zod",
+      "imported": ["z"],
+      "declaredRange": "^3.25.76",
+      "installedVersion": "4.6.7",
+      "baselineVersion": "3.25.76",
       "hasOfflineFingerprint": true,
       "symbolPresentInOld": true,
       "symbolPresentInInstalled": true,
       "status": "RESOLVED",
-      "whyCounterexample": "防『版本号变大就报漂移』：判据是符号行为，不是 semver 字符串",
-      "evidence": { "rule": "plan/03 §5", "toFillIn": "M3" }
+      "whyCounterexample": "防『版本号变大就报漂移』：z 跨 major 仍在，判据是符号行为不是 semver 字符串",
+      "evidence": {
+        "rule": "plan/03 §5",
+        "baselineEvidence": "data/fingerprints/zod.json 的 surfaces[\".\"].import 含 z",
+        "installedEvidence": "node_modules/zod 的 . 导出面同样含 z"
+      }
     },
     {
       "id": "c6-3-no-baseline",
       "file": "src/uses-api-no-history.mjs",
       "line": 2,
+      "kind": "import",
+      "specifier": "date-fns",
+      "imported": ["addDays"],
       "declaredRange": "^3.0.0",
       "installedVersion": "4.4.0",
       "hasOfflineFingerprint": false,
-      "status": "NO-BASELINE",
-      "whyHonestyValve": "没有指纹就不许猜；防『看到 range 不匹配就报 DRIFT』",
+      "status": "RESOLVED",
+      "driftStatus": "NO-BASELINE",
+      "whyTwoLayers": "同一个引用点上两层的结论各自成立且都对：check 层 addDays 确实在 4.4.0 的导出面上（RESOLVED）；drift 层没有 date-fns 的离线基线，漂移不可判（NO-BASELINE）。真值分两层声明，正是不许把它们挤成一个字段——挤了必有一方失声",
+      "whyHonestyValve": "没有基线就不许猜；防『看到 range 不匹配就报 DRIFT』。data/fingerprints/ 下只有 zod.json，无 date-fns.json",
       "goesTo": "gaps",
       "countsAsProblem": false,
-      "evidence": { "rule": "plan/03 §5 + data/README.md §5.1", "toFillIn": "M3" }
+      "evidence": {
+        "rule": "plan/03 §5 + data/README.md §5.1",
+        "baselineEvidence": "data/fingerprints/ 无 date-fns.json",
+        "extraWhy": "实测 date-fns 3.6.0→4.4.0 根导出面无减少，因此本点即使补了基线也不会红——它把『无基线』与『有基线但无漂移』彻底分开"
+      }
     }
   ]
 }

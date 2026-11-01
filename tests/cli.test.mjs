@@ -249,16 +249,98 @@ test("输出中不含绝对路径（隐私红线）", () => {
   }
 });
 
-test("selftest / bench 未实现时退出 3（不假装成功）", () => {
-  assert.equal(run(["selftest"]).code, 3);
-  assert.equal(run(["bench"]).code, 3);
-  assert.match(run(["bench"]).err, /尚未实现/);
-});
-
-test("drift 未实现时退出 3（M3 落位，不假装成功）", () => {
-  const r = run(["drift", "."]);
+test("selftest 未实现时退出 3（不假装成功）", () => {
+  const r = run(["selftest"]);
   assert.equal(r.code, 3);
   assert.match(r.err, /尚未实现/);
+});
+
+test("drift 已落位（M3）：无基线时退出 3，不是 0（'没跑'与'跑了没问题'必须不同码）", () => {
+  // 最小工程：声明 date-fns 但 data/fingerprints 下没有它的基线 → 只有 NO-BASELINE
+  const dir = makeProject({
+    "package.json": '{"name":"p","version":"0.0.0","dependencies":{"chalk":"^6.0.1"}}',
+    "node_modules/chalk/package.json": CHALK_PKG,
+    "node_modules/chalk/source/index.js": CHALK_ENTRY,
+    "src/a.mjs": 'import { red } from "chalk";\nexport const x = red;\n',
+  });
+  try {
+    const r = run(["drift", ".", "--json"], dir);
+    assert.equal(r.code, 3, `无基线应 3，实际 ${r.code}：${r.out.slice(0, 300)}`);
+    const parsed = JSON.parse(r.out);
+    assert.ok(parsed.gaps.some((g) => g.kind === "NO-BASELINE"), "缺基线必须记 NO-BASELINE 进 gaps");
+    assert.equal(parsed.summary.problems, 0, "NO-BASELINE 不得算成 problems");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("drift：基线版本 == 已装版本时不判漂移（同一份导出面，不是猜）", () => {
+  // 造一个"已装版本就是基线版本"的工程：基线声明 6.0.1，装的也是 6.0.1
+  const dir = makeProject({
+    "package.json": '{"name":"p","version":"0.0.0","dependencies":{"chalk":"^6.0.1"}}',
+    "node_modules/chalk/package.json": CHALK_PKG,
+    "node_modules/chalk/source/index.js": CHALK_ENTRY,
+    "data/fingerprints/chalk.json": JSON.stringify({
+      name: "chalk",
+      baselineVersion: "6.0.1",
+      surfaces: { ".": { import: ["red", "default"], require: null } },
+    }),
+    "src/a.mjs": 'import { red } from "chalk";\nexport const x = red;\n',
+  });
+  try {
+    const r = run(["drift", ".", "--json"], dir);
+    assert.equal(r.code, 0, `同版本不该报漂移，实际 ${r.code}：${r.out.slice(0, 300)}`);
+    assert.equal(JSON.parse(r.out).summary.problems, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("drift：符号在基线有、已装没有 → DRIFT，退出 1", () => {
+  const dir = makeProject({
+    "package.json": '{"name":"p","version":"0.0.0","dependencies":{"chalk":"^6.0.1"}}',
+    // 已装版本 6.0.1 的导出面只有 red；基线（旧版 5.0.0）里还有一个 blue
+    "node_modules/chalk/package.json": CHALK_PKG,
+    "node_modules/chalk/source/index.js": CHALK_ENTRY,
+    "data/fingerprints/chalk.json": JSON.stringify({
+      name: "chalk",
+      baselineVersion: "5.0.0",
+      surfaces: { ".": { import: ["red", "blue", "default"], require: null } },
+    }),
+    "src/a.mjs": 'import { blue } from "chalk";\nexport const x = blue;\n',
+  });
+  try {
+    const r = run(["drift", ".", "--json"], dir);
+    assert.equal(r.code, 1, `真漂移应退出 1，实际 ${r.code}：${r.out.slice(0, 400)}`);
+    const parsed = JSON.parse(r.out);
+    const f = parsed.findings.find((x) => x.status === "VERSION-BEHAVIOR-DRIFT");
+    assert.ok(f, "应有一条 VERSION-BEHAVIOR-DRIFT");
+    assert.deepEqual(f.missing, ["blue"]);
+    assert.equal(parsed.summary.problems, 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("drift：引用的符号在两版都在 → 不报漂移（防'版本号变大就报红'）", () => {
+  const dir = makeProject({
+    "package.json": '{"name":"p","version":"0.0.0","dependencies":{"chalk":"^6.0.1"}}',
+    "node_modules/chalk/package.json": CHALK_PKG,
+    "node_modules/chalk/source/index.js": CHALK_ENTRY,
+    "data/fingerprints/chalk.json": JSON.stringify({
+      name: "chalk",
+      baselineVersion: "5.0.0",
+      surfaces: { ".": { import: ["red", "blue", "default"], require: null } },
+    }),
+    // red 在基线里也有、已装里也有 → 本点不漂移
+    "src/a.mjs": 'import { red } from "chalk";\nexport const x = red;\n',
+  });
+  try {
+    const r = run(["drift", ".", "--json"], dir);
+    assert.equal(r.code, 0, `符号仍在不该报漂移，实际 ${r.code}：${r.out.slice(0, 400)}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("snapshot：事实层算得出 → 退出 0；不缺依赖时不因'没判定'退出 1", () => {

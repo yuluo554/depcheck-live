@@ -69,6 +69,9 @@ jobs:
           tests/fixtures-layout.test.mjs
           tests/fixtures-run.test.mjs
           tests/cli.test.mjs
+          tests/drift.test.mjs
+          tests/baselines.test.mjs
+          tests/bench.test.mjs
       - name: CLI 冒烟（退出码 0 / 4 / 3）
         shell: bash
         run: |

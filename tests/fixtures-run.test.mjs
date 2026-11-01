@@ -31,6 +31,9 @@ const FIVE = ["chalk", "zod", "date-fns", "commander", "glob"];
 /** C1–C5（C6 属 M3、C7 属 M4）。 */
 const CASES = ["resolved-basic", "missing-export", "esm-cjs-mismatch", "subpath-blocked", "ambiguous-dynamic"];
 
+/** C6 的实跑要带 `--with-drift` + 本仓基线，单独一组（M3 落位）。 */
+const C6 = "drift-baseline";
+
 /** 五包是否都在本仓根装好（缺一个就不跑，避免"半装"给出假结论）。 */
 const depsReady = () => FIVE.every((p) => existsSync(join(ROOT_NM, p, "package.json")));
 
@@ -136,6 +139,98 @@ for (const dir of CASES) {
     }
   });
 }
+
+// ───────────────────── C6（drift，M3）：分层对账 ─────────────────────
+//
+// C6 与 C1–C5 的差别是**两层**：`check` 层的判定态 + `drift` 层的漂移结论。
+// 一个引用点上两层的结论可以各自正确且不同（点 3：check=RESOLVED，drift=NO-BASELINE），
+// 所以真值用 `status` / `driftStatus` 分别声明，这里也分两层对账。
+
+test(`${C6}：逐点 status / driftStatus 与 expected.json 一致（含 chalk 式分层反例）`, (t) => {
+  if (!depsReady()) {
+    t.skip(`本仓根 node_modules 缺五包之一（npm i --no-save ${FIVE.join(" ")}），无法实跑`);
+    return;
+  }
+  const work = materialize(C6);
+  try {
+    const expected = readExpected(C6);
+    // 用 CLI 跑，确保测的是用户实际敲的那条路径（含 --with-drift 与基线目录解析）
+    const r = spawnSync(process.execPath, [BIN, "check", work, "--json", "--with-drift"], {
+      cwd: ROOT,
+      encoding: "utf8",
+    });
+    const parsed = JSON.parse(r.stdout);
+    assert.ok(parsed, `输出不是合法 JSON: ${(r.stdout ?? "").slice(0, 300)}`);
+
+    // 两层拉平
+    const checkLayer = new Map();
+    for (const f of parsed.findings) checkLayer.set(`${f.file}|${f.line}|${f.specifier ?? ""}`, f.status);
+    const driftLayer = new Map();
+    for (const g of parsed.gaps) {
+      if (g.kind === "NO-BASELINE" || g.kind === "VERSION-BEHAVIOR-DRIFT") {
+        driftLayer.set(`${g.file}|${g.line}|${g.specifier ?? ""}`, g.kind);
+      }
+    }
+
+    for (const point of expected.points) {
+      const key = `${point.file}|${point.line}|${point.specifier ?? ""}`;
+      if (point.status !== undefined) {
+        assert.equal(checkLayer.get(key), point.status, `${point.id}（${key}）check 层应为 ${point.status}`);
+      }
+      if (point.driftStatus !== undefined) {
+        assert.equal(driftLayer.get(key), point.driftStatus, `${point.id}（${key}）drift 层应为 ${point.driftStatus}`);
+      }
+    }
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
+test(`${C6}：summary 的 problems / gaps / byStatus 与真值一致`, (t) => {
+  if (!depsReady()) {
+    t.skip(`本仓根 node_modules 缺五包之一`);
+    return;
+  }
+  const work = materialize(C6);
+  try {
+    const want = readExpected(C6).expect.summary;
+    const r = spawnSync(process.execPath, [BIN, "check", work, "--json", "--with-drift"], {
+      cwd: ROOT,
+      encoding: "utf8",
+    });
+    const got = JSON.parse(r.stdout).summary;
+    assert.equal(got.problems, want.problems, `problems 应为 ${want.problems}，实际 ${got.problems}`);
+    assert.equal(got.gaps, want.gaps, `gaps 应为 ${want.gaps}，实际 ${got.gaps}`);
+    for (const [status, count] of Object.entries(want.byStatus ?? {})) {
+      assert.equal(got.byStatus[status] ?? 0, count, `byStatus.${status} 应为 ${count}`);
+    }
+    // ★ 反"同一引用点被算两遍"：1 红不能读成 2 红
+    assert.equal(got.problems, 1, "DRIFT 是同一引用点上更精确的诊断，不得与 MISSING-EXPORT 重复计数");
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
+test(`${C6}：drift 命令单独跑时退出 1（有 DRIFT），且 NO-BASELINE 不进 problems`, (t) => {
+  if (!depsReady()) {
+    t.skip(`本仓根 node_modules 缺五包之一`);
+    return;
+  }
+  const work = materialize(C6);
+  try {
+    const r = spawnSync(
+      process.execPath,
+      [BIN, "drift", work, "--json", "--baseline-dir", join(ROOT, "data", "fingerprints")],
+      { cwd: ROOT, encoding: "utf8" },
+    );
+    assert.equal(r.status, 1, `有 DRIFT 应退出 1，实际 ${r.status}`);
+    const parsed = JSON.parse(r.stdout);
+    assert.equal(parsed.summary.problems, 1);
+    assert.ok(parsed.gaps.some((g) => g.kind === "NO-BASELINE"), "date-fns 无基线必须记 NO-BASELINE");
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
 
 test("五包 + 五份语料的 parseState 全 OK（UNPARSEABLE = 0，M2 DoD1）", (t) => {
   if (!depsReady()) {
