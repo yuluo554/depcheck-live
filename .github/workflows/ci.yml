@@ -71,6 +71,7 @@ jobs:
           tests/cli.test.mjs
           tests/drift.test.mjs
           tests/baselines.test.mjs
+          tests/contract.test.mjs
           tests/bench.test.mjs
           tests/selftest.test.mjs
       - name: CLI 冒烟（退出码 0 / 4 / 3）

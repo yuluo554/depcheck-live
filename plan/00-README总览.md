@@ -9,8 +9,8 @@
 | 00 | `plan/00-README总览.md` | ✅ 本文件 |
 | 01 | `plan/01-题目文档.md` | ✅ 定稿 v1 |
 | 02 | `plan/02-架构与技术选型.md` | ✅ M0 |
-| 03 | `plan/03-模块详设.md` | ✅ M3（模块 ①②③ 已回填实测口径；④ `drift` 已落位；⑤ 报告待 M4） |
-| 04 | `plan/04-数据计划.md` | ✅ M3（语料 C1–C6 已落地并逐点对账；C7 待 M4） |
+| 03 | `plan/03-模块详设.md` | ✅ M3（模块 ①②③ 已回填实测口径；④ `drift` 已落位；⑤ 报告 M5 已落位） |
+| 04 | `plan/04-数据计划.md` | ✅ M3（语料 C1–C7 已全部落地并逐点对账） |
 | 05 | `plan/05-里程碑与发布.md` | ✅ M0 |
 | 06 | `plan/06-交付对标与决策.md` | ✅ M0 |
 | — | `data/README.md` | ✅ 依据查证 + 口径唯一定义 |
@@ -58,7 +58,7 @@
 | `VERSION-BEHAVIOR-DRIFT` 判定 | 离线指纹包 | ✅ | `bench` + C6 逐点对账（离线基线 `data/fingerprints/`） | ✅ M3 |
 | 退出码语义可分 | `data/README.md` §5 | ✅ | `selftest`（8 条断言覆盖 0/1/3/4）+ `tests/selftest.test.mjs` + `tests/cli.test.mjs` | ✅ M4 |
 | 干净工程零误报 | 合成干净语料 | ✅ | `bench --clean`（C7：problems=0 且 totalPoints=7） | ✅ M4 |
-| Skill 契约块双向一致 | `SKILL.md` ↔ `src/contract.mjs` | ✅ | `tests/contract.test.mjs` | ⬜ 待 M5 |
+| Skill 契约块双向一致 | `SKILL.md` ↔ `src/contract.mjs` | ✅ | `tests/contract.test.mjs`（双向 + 按行归属）+ `tools/verify-contract-mutations.mjs`（11/11 CAUGHT） | ✅ M5 |
 | 裸 clone 可复现 | README 步骤 | ✅ | 手工 + CI（待首推） | ⬜ 待 M6 |
 | 布局门可跑红（10 条判据） | `tools/check-sprint-layout.mjs` | ✅ | `tools/mutate-gates.mjs` | ✅ M0 |
 | `exports` 六形态语义经原文+实测双源核对 | Node 官方 `packages.html` + `esm.html` 解析算法 + 本机实测 | ✅ | `tests/resolve.test.mjs`（每条标注实测编号） | ✅ M1 |
@@ -77,17 +77,20 @@
 | M2 | 解析层：`exports` 解析器 + 引用点抽取器 + `fixtures/` 落地（含 `snapshot` / `scan` 命令） | ✅ 已完成 |
 | M3 | 判定层：五个判定态 + `drift`（离线基线）+ `bench` | ✅ 已完成 |
 | M4 | 基准：`bench` / `selftest` / 退出码断言 / 干净零误报集 | ✅ 已完成 |
-| M5 | 交付：CLI 完整面 + `SKILL.md`（契约块双向断言）+ 技术报告 + demo GIF | ⬜ 待 M5 |
+| M5 | 交付：CLI 完整面 + `SKILL.md`（契约块双向断言）+ 技术报告 + demo GIF | ✅ 已完成 |
 | M6 | 发布：脱敏 + 干净环境验证 + 建仓 + CI 首跑 + tag + Release | ⬜ 待 M6 |
 
 ## 5. 逐形态验收四格表
 
 | 形态 | 主入口 | 主命令/控件 | 接到哪个业务函数 | 断言在哪条测试 | 产物在哪个附件 |
 |---|---|---|---|---|---|
-| CLI | `package.json` 的 `bin` 字段 | `depcheck-live check <path> --json` | `src/check.mjs::checkAll()` | `tests/cli.test.mjs` | Release 附件 `depcheck-live-<ver>.zip` |
-| Agent Skill | `SKILL.md` 契约块 | 契约块声明的五判定态 + 退出码 | `src/api.mjs::run()` | `tests/contract.test.mjs`（双向断言） | 同上 |
+| CLI | `package.json` 的 `bin` 字段 | `depcheck-live check <path> --json` | `src/api.mjs::checkAll()` | `tests/cli.test.mjs` | Release 附件 `depcheck-live-<ver>.zip` |
+| Agent Skill | `SKILL.md` 契约块 | 契约块声明的五判定态 + 退出码 | `src/api.mjs::checkAll()` + `src/api.mjs::decideExit()` | `tests/contract.test.mjs`（双向断言） | 同上 |
 
-> **任一行有空格 → 该形态视为未交付。** 本表在 M5 逐格填绿。M0 已完成第 3 列指向与第 4 列文件落位（断言内容待 M4/M5 充实）。
+> **任一行有空格 → 该形态视为未交付。** 本表在 M5 逐格填绿。
+> 第 3 列点名的函数由 `tests/contract.test.mjs` 的"四格表点名的函数必须真实 export"断言守门
+> ——**M0 的 `src/api.mjs::run()` 与 `src/check.mjs::checkAll()` 都是悬空引用**（`run` 从不存在，
+> `checkAll` 实际在 `api.mjs`），M5 已修实为真实存在的 `checkAll()` / `decideExit()`。
 
 ## 6. 招牌动词表
 

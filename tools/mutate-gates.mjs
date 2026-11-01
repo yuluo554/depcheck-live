@@ -58,6 +58,15 @@ function mutateFile(cwd, rel, from, to) {
 }
 
 const LAYOUT = ["node", "tools/check-sprint-layout.mjs"];
+
+/** 造一份"七节齐"的交接单正文——变异靶子要能过七节判据，才能让半边②单独变红。 */
+function handoffBody(k, why) {
+  return (
+    `# HANDOFF-M${k}\n\n## 一、当前进度 + 证据\n\n（${why}）\n\n` +
+    "## 二、当前事实 · 状态不变量\n## 三、下一棒待办\n## 四、既定口径清单\n" +
+    "## 五、本机环境坑\n## 六、DoD 逐项 checklist\n## 七、关键命令速查\n"
+  );
+}
 const DESENS = ["node", "tools/check-desensitized.mjs"];
 const PLAN00 = "plan/00-README总览.md";
 const PLAN05 = "plan/05-里程碑与发布.md";
@@ -152,24 +161,42 @@ const GROUPS = [
     judge: "LAYOUT.HANDOFFS",
     name: "给还没开工的里程碑预写入口（半边②：超前入口必须红）",
     // 半边②若从不被断言，"给没跑的棒预写当前进度+证据"整族会静默放行。
-    // 靶子 = 当前里程碑之后的那个 ⬜（如当前是 M2 就造 HANDOFF-M3.md）。
+    //
+    // ⚠️ **M5 实测修正**：首版靶子 = "当前里程碑之后的那个 ⬜"（`pending.length >= 2` 才成立）。
+    //    那是**锚进度状态**——M5 收尾后只剩 M6 一个 ⬜，`pending.length = 1`，本组直接 SKIP，
+    //    宿主报"1 组不符预期"。而本文件头部纪律明写"变异靶子一律锚**既有事实**，永不随进度过期"，
+    //    这条靶子恰恰违反了它。
+    //
+    // 正解：门的半边②本来就有**两条独立判据**，用不随进度变化的那条做靶子——
+    //   ① 表内里程碑：⬜ 且非 current 的不许有入口（进度相关，只在 ⬜ ≥ 2 时可用）；
+    //   ② **野编号**：`HANDOFF-M<k>.md` 里 k 不在这 7 个里程碑里 → 也算超前入口。
+    //      这条与进度无关，任何时刻都有靶子。
+    // 优先级：有 ⬜ ≥ 2 时用 ①（更贴近真实误用场景）；否则退到 ②（永远成立）。
     apply: (cwd) => {
       const text = readFileSync(join(cwd, "plan/05-里程碑与发布.md"), "utf8");
+      const all = [];
       const pending = [];
       for (const line of text.split("\n")) {
         const m = /^\|\s*\*{0,2}M(\d+)\b/.exec(line);
-        if (m && /[⬜🟡]/.test(line)) pending.push(Number(m[1]));
+        if (!m) continue;
+        all.push(Number(m[1]));
+        if (/[⬜🟡]/.test(line)) pending.push(Number(m[1]));
       }
-      if (pending.length < 2) return { ok: false, why: "未开工的里程碑不足 2 个，本组不适用" };
-      const future = Math.min(...pending.filter((k) => k !== Math.min(...pending)));
-      const rel = join(cwd, "plan", `HANDOFF-M${future}.md`);
-      if (existsSync(rel)) return { ok: false, why: `plan/HANDOFF-M${future}.md 已存在（基线就有超前入口？）` };
-      writeFileSync(
-        rel,
-        `# HANDOFF-M${future}\n\n## 一、当前进度 + 证据\n\n（这条是变异靶子：给还没开工的里程碑预写入口）\n\n` +
-          "## 二、当前事实 · 状态不变量\n## 三、下一棒待办\n## 四、既定口径清单\n" +
-          "## 五、本机环境坑\n## 六、DoD 逐项 checklist\n## 七、关键命令速查\n",
-      );
+
+      if (pending.length >= 2) {
+        // 判据①：造一个"表内但未开工、且不是当前"的里程碑入口
+        const future = Math.min(...pending.filter((k) => k !== Math.min(...pending)));
+        const rel = join(cwd, "plan", `HANDOFF-M${future}.md`);
+        if (existsSync(rel)) return { ok: false, why: `plan/HANDOFF-M${future}.md 已存在（基线就有超前入口？）` };
+        writeFileSync(rel, handoffBody(future, "这条是变异靶子：给还没开工的里程碑预写入口"));
+        return { ok: true };
+      }
+
+      // 判据②：野编号（不在里程碑表里的 k）。与进度无关，任何时刻都成立。
+      const wild = Math.max(0, ...all) + 1;
+      const rel = join(cwd, "plan", `HANDOFF-M${wild}.md`);
+      if (existsSync(rel)) return { ok: false, why: `plan/HANDOFF-M${wild}.md 已存在（基线就有野编号入口？）` };
+      writeFileSync(rel, handoffBody(wild, `这条是变异靶子：M${wild} 不在这 7 个里程碑里（野编号）`));
       return { ok: true };
     },
   },
