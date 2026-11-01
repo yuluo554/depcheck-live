@@ -19,7 +19,7 @@ M6（发布）已全部完成，`plan/00` §4、`plan/05` §1 与本文件三处
 | 发布门的变异验证 | `tools/mutate-gates.mjs` 新增 **R1–R6** | 三道门共 **26/26 CAUGHT**（含 1 条阴性对照） |
 | 发布留档 | `plan/RELEASE-M6.md` | 两栏齐 + 事实块（机器读）+ 覆盖对账 6 行三态 |
 | 远端仓库 | `https://github.com/yuluo554/depcheck-live`（public） | `gh repo create` + push（SSH 远端） |
-| CI 首跑 | run **`41322262071`** | **success**，7 个 job 全绿 |
+| CI 实跑 | run **`41322262071`**（首轮）+ **`41323571342`**（全 ✅ 收尾轮） | 两条均 **success**，各 7 个 job 全绿 |
 | tag + Release | `v0.1.0` + 附件 `depcheck-live-0.1.0.zip` | 1 238 166 字节，sha256 `44f00d5a…`，`--online` 回取一致 |
 | 干净环境 | 裸 clone 8 步 | `npm test` 222（192 pass / 30 skip）→ 门三道 → `selftest` 8/8 → `check .` 回 3 |
 
@@ -222,7 +222,7 @@ M0 的 K1–K11、M1 的 K12–K21、M2 的 K22–K26、M3 的 K27–K32、M4 �
 | 2 | 干净环境（裸 clone + 无 `node_modules`）按 README 逐条敲通 | ✅ | 8 步实测，`plan/RELEASE-M6.md` §1.3 |
 | 3 | ① tag ② Release（≥1 附件 + 本地副本 + sha256）③ 发布留档 | ✅ | `v0.1.0` + zip（1 238 166 B）+ `--online` 回取一致 |
 | 4 | 发布门三档无 FAIL；进 CI 的是跨触发成立那一档 | ✅ | 三档实跑；CI 只挂离线档（R1–R6 变异全 CAUGHT） |
-| 5 | CI 实跑（远端） | ✅ | run `41322262071` **success**，7 job 全绿，六腿逐腿 222/192/0/30 |
+| 5 | CI 实跑（远端） | ✅ | 首轮 run `41322262071` + 全 ✅ 收尾轮 `41323571342`，均 **success**（7 job 全绿，六腿逐腿 222/192/0/30） |
 
 **M6 出口判据全部达成。全项目 7/7 里程碑 ✅。**
 
