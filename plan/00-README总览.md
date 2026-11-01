@@ -59,7 +59,7 @@
 | 退出码语义可分 | `data/README.md` §5 | ✅ | `selftest`（8 条断言覆盖 0/1/3/4）+ `tests/selftest.test.mjs` + `tests/cli.test.mjs` | ✅ M4 |
 | 干净工程零误报 | 合成干净语料 | ✅ | `bench --clean`（C7：problems=0 且 totalPoints=7） | ✅ M4 |
 | Skill 契约块双向一致 | `SKILL.md` ↔ `src/contract.mjs` | ✅ | `tests/contract.test.mjs`（双向 + 按行归属）+ `tools/verify-contract-mutations.mjs`（11/11 CAUGHT） | ✅ M5 |
-| 裸 clone 可复现 | README 步骤 | ✅ | 裸 clone：`npm test` 222（192 pass / 30 skip）→ `--version` → 门三道 → `selftest` 8/8；远端 CI run `41322262071` 六腿一致 | ✅ M6 |
+| 裸 clone 可复现 | README 步骤 | ✅ | 裸 clone：`npm test` 223（193 pass / 30 skip）→ `--version` → 门三道 → `selftest` 8/8；远端 CI 三轮 success，最终六腿 223/193/0/30 | ✅ M6 |
 | 布局门可跑红（10 条判据） | `tools/check-sprint-layout.mjs` | ✅ | `tools/mutate-gates.mjs` | ✅ M0 |
 | `exports` 六形态语义经原文+实测双源核对 | Node 官方 `packages.html` + `esm.html` 解析算法 + 本机实测 | ✅ | `tests/resolve.test.mjs`（每条标注实测编号） | ✅ M1 |
 | 五包 `exports` 指纹可独立复算 | `data/packages/*.json` 的 `canonical` | ✅ | `tests/fingerprints.test.mjs` + `--check` 逐字节 | ✅ M1 |

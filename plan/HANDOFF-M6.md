@@ -19,18 +19,18 @@ M6（发布）已全部完成，`plan/00` §4、`plan/05` §1 与本文件三处
 | 发布门的变异验证 | `tools/mutate-gates.mjs` 新增 **R1–R6** | 三道门共 **26/26 CAUGHT**（含 1 条阴性对照） |
 | 发布留档 | `plan/RELEASE-M6.md` | 两栏齐 + 事实块（机器读）+ 覆盖对账 6 行三态 |
 | 远端仓库 | `https://github.com/yuluo554/depcheck-live`（public） | `gh repo create` + push（SSH 远端） |
-| CI 实跑 | run **`41322262071`**（首轮）+ **`41323571342`**（全 ✅ 收尾轮） | 两条均 **success**，各 7 个 job 全绿 |
+| CI 实跑 | run **`41322262071`**（首轮）+ **`41323571342`** / **`41324209400`**（全 ✅ 收尾轮） | 三轮均 **success**，各 7 个 job 全绿 |
 | tag + Release | `v0.1.0` + 附件 `depcheck-live-0.1.0.zip` | 1 238 166 字节，sha256 `44f00d5a…`，`--online` 回取一致 |
 | 干净环境 | 裸 clone 8 步 | `npm test` 222（192 pass / 30 skip）→ 门三道 → `selftest` 8/8 → `check .` 回 3 |
 
 **M6 后的实测数字**（本机，装包状态）：
-`npm test` = **222 passed / 0 failed / 0 skipped**（M5 收尾 209，M6 新增 13）；
+`npm test` = **223 passed / 0 failed / 0 skipped**（M5 收尾 209；M6 新增 14）；
 `selftest` = **8/8**；`bench` = 28/28 逐条、49/49 计数；`bench --clean` = 7/7 逐条、14/14 计数；
 `gen-fingerprints --check` = 5/5；`gen-baselines --check` = 1/1；
 脱敏门 **0 命中**（127 个文本文件）；布局门 **10 条全绿**；变异组 **26/26 CAUGHT**；
 契约变异组 **11/11 CAUGHT**；发布门三档全绿。
 
-> ⚠️ **裸 clone / CI 上是 `222 tests / 192 pass / 30 skipped / 0 fail`，不是 222 pass。**
+> ⚠️ **裸 clone / CI 上是 `223 tests / 193 pass / 30 skipped / 0 fail`，不是 223 pass。**
 > 那 30 条全是要真实五包的那一档，代码里显式 `t.skip` 并写明缺什么。
 > **把 skip 数读成 pass 数是假绿**——`plan/05` §4 U2 与本文件都据实写 skip 数。
 
@@ -129,7 +129,7 @@ M6（发布）已全部完成，`plan/00` §4、`plan/05` §1 与本文件三处
 
 ```bash
 node tools/check-sprint-layout.mjs        # 必须全绿（10 条）
-npm test                                  # 装包环境 222/222；裸 clone 222/192 pass/30 skip
+npm test                                  # 装包环境 223/223；裸 clone 223/193 pass/30 skip
 node tools/check-desensitized.mjs         # 必须 0 命中
 node tools/check-release.mjs              # 离线档必须全绿
 node tools/mutate-gates.mjs               # 必须 26/26 CAUGHT
@@ -246,7 +246,7 @@ node tools/mutate-gates.mjs                # 三道门的变异验证，期望 2
 node tools/verify-contract-mutations.mjs   # 契约测试的变异验证，期望 11/11
 
 # 测试
-npm test                                   # 装包环境 222/222；裸 clone 222/192 pass/30 skip
+npm test                                   # 装包环境 223/223；裸 clone 223/193 pass/30 skip
 
 # 指纹与基线
 node tools/gen-fingerprints.mjs --check    # 逐字节校验，期望 5/5
