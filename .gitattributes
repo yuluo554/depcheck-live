@@ -1,0 +1,9 @@
+# 源码与文本一律 LF（双跑比对与生成器 --check 都按字节判，CRLF 会让比对在 windows 腿红）
+* text=auto eol=lf
+
+# 字节本身是断言对象的文件 → git 不许碰（-text）
+*.gif binary
+*.png binary
+*.zip binary
+
+# 测试夹具里的 CRLF 样本若将来出现，登记这里并标 -text
