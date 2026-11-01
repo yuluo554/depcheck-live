@@ -18,13 +18,19 @@ M3（判定层）已全部完成，`plan/00` §4、`plan/05` §1 与本文件三
 | `NO-BASELINE` 退出码口径裁定 | `data/README.md` §5.1 + `plan/03` §5 纠正 + C6 真值 | `tests/drift.test.mjs` 的"只有 NO-BASELINE → 3"条 |
 
 **M3 交付后的实测数字**（本机 2026-11-01）：
-`npm test` = **174 passed / 0 failed / 0 skipped**（M2 收尾时 140）；
+`npm test` = **177 passed / 0 failed / 0 skipped**（M2 收尾时 140；M3 复审后 177）；
 `gen-fingerprints --check` = **5/5 逐字节一致**；`gen-baselines --check` = **1/1 自洽**；
 脱敏门 **0 命中**（扫 103 个文本文件）；布局门 **10 条判据全绿**；变异组 **20/20 CAUGHT**；
 `node bin/depcheck-live.mjs bench` = **6 语料 / 28 引用点 / 28 通过 / 0 失败**。
 
-### M3 的四条招牌发现（M4 必须知道，否则会踩）
+### M3 的五条招牌发现（M4 必须知道，否则会踩）
 
+0. **★ 真值字段"声明了但没人断言" = 假门。** M3 首次收尾时 `drift-baseline/expected.json` 里的
+   `exitCodeWhenOnlyNoBaseline` / `exitCodeWhenDrift` / `problemsCountsDrift` /
+   `noBaselineCountsProblems` / `noBaselineGoesTo` **五个字段没有任何测试引用**——
+   测试全绿，但它们可以悄悄失配。复审补了 3 条断言后发现修复前**确实**有一条会红。
+   **M4 写 `selftest` 时先自问：我声明的每个真值字段，有哪条测试读它？**
+   检查手法：`grep <字段名> tests/`，零命中就是假门。
 1. **`drift` 的原骨架（按包比整份 `exports` 指纹）是系统性假阳性。**
    实测 `date-fns` 3.6.0 → 4.4.0 的 `.` 导出面 **251 个名字一个不少**（只新增 134 个子路径键）。
    整份指纹必然不同 → 按包比会把"纯加法升级"全判成漂移。**判据必须逐引用点求值**
@@ -74,7 +80,7 @@ M3（判定层）已全部完成，`plan/00` §4、`plan/05` §1 与本文件三
 1. **先跑入口体检**（每个对话开头固定动作）：
    ```bash
    node tools/check-sprint-layout.mjs      # 必须全绿
-   npm test                                # 期望 174/174
+   npm test                                # 期望 177/177
    node tools/gen-fingerprints.mjs --check # 期望 5/5
    node tools/gen-baselines.mjs --check    # 期望 1/1
    node tools/mutate-gates.mjs             # 期望 20/20
@@ -154,7 +160,7 @@ node tools/check-desensitized.mjs       # 脱敏门，期望 0 命中
 node tools/mutate-gates.mjs             # 变异验证，期望 20/20
 
 # 测试
-npm test                                # 期望 174/174（M4 起会增加）
+npm test                                # 期望 177/177（M4 起会增加）
 
 # 指纹与基线
 node tools/gen-fingerprints.mjs --check # 逐字节校验，期望 5/5
