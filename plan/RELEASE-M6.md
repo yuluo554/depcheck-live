@@ -14,7 +14,7 @@
 | version | 0.1.0 |
 | tag | v0.1.0 |
 | attachment | depcheck-live-0.1.0.zip |
-| attachmentSha256 | |
+| attachmentSha256 | 44f00d5a0d9f2270003ea23b0a5f7cb727ca6f05bffaa1d8f8e1728ef47d8732 |
 
 <!-- RELEASE-FACTS:END -->
 
@@ -105,7 +105,102 @@
 > tag 之后才允许往里追加，追加的都是**事后事实**：真实 run id、回取校验、解出树复跑结果。
 > **补记是追加，不回填、不改写上方 §一 的历史措辞**——写错就另起一条更正。
 
-（待 tag 后追加）
+### 2.1 tag 与 Release（实跑，2026-11-01）
+
+| 项 | 值 |
+|---|---|
+| tag | `v0.1.0`（annotated，指向提交 `6aa8899`） |
+| 远端仓库 | `https://github.com/yuluo554/depcheck-live`（public） |
+| Release URL | `https://github.com/yuluo554/depcheck-live/releases/tag/v0.1.0` |
+| 附件 | `depcheck-live-0.1.0.zip`（1 238 166 字节，state `uploaded`） |
+| 附件 sha256 | `44f00d5a0d9f2270003ea23b0a5f7cb727ca6f05bffaa1d8f8e1728ef47d8732` |
+| 本地副本 | `dist-release/depcheck-live-0.1.0.zip`（`dist-release/` 已 gitignore，不入库） |
+
+生成方式：`git archive --format=zip --prefix=depcheck-live-0.1.0/ -o … v0.1.0`。
+**先 tag、再 archive、再算 sha256、最后写回本节** —— zip 内容含本文件，若先把 sha256 写进来，
+打包后 sha256 立刻失效（自指）。顺序不可调换。
+
+### 2.2 CI 首推实跑（`plan/05` §4 U1/U2 收口）
+
+| 项 | 值 |
+|---|---|
+| run id | **`41322262071`** |
+| 触发 | `push` → `main`，head sha `7accbe37cf2c8892be21a8129d71d3b549b5da19` |
+| 结论 | **success**（7 个 job 全绿） |
+| job 明细 | 门（布局 / 脱敏 / 发布 / 变异）× 1；测试 × 6（node 20 / 22 / 24 × ubuntu / windows） |
+| 测试实测 | 六条矩阵腿**逐腿一致**：`tests 222 / pass 192 / fail 0 / skipped 30` |
+| 门实测 | 布局门全绿、脱敏门 0 命中、发布门离线档全绿、变异宿主 **26/26 CAUGHT** |
+
+> **30 条 skip 在 CI 上同样是设计**：CI 不装五包（零依赖承诺 → 不跑 `npm install`），
+> 那档测试显式 `t.skip` 并写明缺什么。**不许把 30 条 skip 读成 30 条 pass。**
+> 跨 node 版本（20/22/24）与两 OS 的行为差异至此**已由远端实跑证明**（U2 收口）。
+
+### 2.3 `git archive v0.1.0` 解出树复跑（DoD 第 1 条后半）
+
+在 `git archive v0.1.0` 解出的树（130 个文件，**不含 `node_modules`**）里逐条实跑：
+
+| 命令 | 结果 |
+|---|---|
+| `node tools/check-sprint-layout.mjs` | 全绿（20 个测试文件 × 两处登记一致） |
+| `node tools/check-desensitized.mjs` | **0 命中**（127 个文本文件） |
+| `node tools/check-release.mjs` | 全绿（离线档） |
+| `npm test` | 222 / 192 pass / 0 fail / 30 skipped |
+| `node bin/depcheck-live.mjs selftest` | 8 / 8 |
+
+### 2.4 Release 回取校验（`--online` 档闭环）
+
+`gh release download v0.1.0 -p depcheck-live-0.1.0.zip` 回取后重算 sha256，
+与留档值逐字节比对——结果见下方「2.5 回取结果」。**回取是独立于上传链路的一步**：
+只看"上传成功"无法排除传输损坏或传错了文件。
+
+### 2.5 回取结果
+
+`node tools/check-release.mjs --online` → **全绿**（退出码 0）。逐条：
+
+| 判据 | 结果 |
+|---|---|
+| `RELEASE.ONLINE` | Release `v0.1.0` 有 1 个附件：`depcheck-live-0.1.0.zip` |
+| `RELEASE.ONLINE_ASSET` | **回取**该附件后重算 sha256 = `44f00d5a0d9f…`，与留档值一致 |
+| `RELEASE.LOCAL_COPY` | `dist-release/` 本地副本与留档 sha256 逐字节一致 |
+
+回取的独立副本由门自己在 `tmp/` 下取、自己算、自己比——**不读上传时的中间产物**，
+所以这条闭环证明的是"用户下载到的东西 = 留档记的东西"。
+
+### 2.6 tag 之后的两处判据修正（**必须记录，不许悄悄改**）
+
+`v0.1.0` 打完之后，状态副本全部翻 ✅ 时暴露出**两处判据锚了"进度状态"**的缺陷。
+两者都是**真缺陷**，不是整理：它们只在"还有 ⬜ 里程碑"时成立，末棒必炸。
+
+| # | 文件 | 缺陷 | 修法 |
+|---|---|---|---|
+| 1 | `tests/handoff-pointer.test.mjs` | 写死 `assert.ok(current !== null, "…全部 ✅ 时本测试应改为只查 done")` —— **报错文案自己写出了修法，代码没照做**。M6 翻 ✅ 后必炸 | 按文案修：`required = done ∪ (current ?? ∅)` |
+| 2 | `tools/mutate-gates.mjs` 的 **H1** 组 | 靶子取"状态表里最小号的 ⬜"，全 ✅ 后没有 ⬜ → **SKIP**（宿主纪律②：SKIP 也算不符预期） | 靶子自己造前置状态：把状态表最小那行（**两个副本同时**）翻回 ⬜，让它成为"当前在做的"，再删其入口 |
+| 3 | `tests/release.test.mjs` 的覆盖对账断言 | 首版要求"三态**各至少出现一次**"——发布做完后"待首推"会**合法地**全部消失，这条要求等于逼仓库永不完结 | 改成"每行状态格必须**落在三态之内**"（不许自造措辞）+ 至少一行是"实现"（防整表全是"不适用"空转） |
+
+> **第 3 条是同一族第三次冒头**，而且这次是我**自己**在 M6 里刚写的。
+
+> **诚实口径，写清代价**：第 1、2 条修正都在 tag **之后**，所以 **`v0.1.0` 的 zip 附件里是旧写法**。
+> 旧写法在 tag 树里能过（tag 树里 M6 仍显示 ⬜ —— 状态副本是打 tag 那一刻的快照），
+> 但任何一个"全 ✅"的仓库都会炸。**下一个 tag 会带上这两处修正。**
+> 第 3 条（本文件的覆盖对账断言）在 tag 时**还只是"三态各至少一次"**且当时成立
+> （那时确实有"待首推"行），所以 tag 树里它是对的；它变成缺陷是在状态翻完之后。
+> `plan/RELEASE-M6.md` 与 `plan/HANDOFF-M6.md` §一 都据实写了，**不回填 §一 的历史措辞**。
+
+> **同族统计**：本仓至今撞了 **5 次**"判据/靶子锚进度"（`mutate-gates` H2 ×2、L8 ×1、H1 ×1、
+> `release.test.mjs` 覆盖对账 ×1）+ **1 次**"报错文案说了修法却没照做"（第 1 条）。
+> 已升为 K40 / K41 两条口径，写进 `plan/HANDOFF-M6.md` §四。改任何门、靶子或断言之前先跑三句自问：
+> ①这个判据/靶子会不会因为本棒干完活而消失？②它报错文案里写的修法我照做了吗？
+> ③它要求"某个状态必须存在"吗——那等于要求仓库永远停在那一步？
+
+### 2.7 一处实测环境事实（不影响产物，但会影响复现）
+
+本机 `git push` 走 HTTPS 时连不上 `github.com:443`（`curl https://github.com/` 同样超时），
+而 `api.github.com` 与 SSH 通道都正常。处置：**远端改用 SSH**（`git@github.com:yuluo554/depcheck-live.git`），
+push 与 tag 推送均成功。`gh` 命令走 API 链路，不受影响。
+
+> 这条**只写现象与既有处置**，不推测成因（可能与本机网络策略有关，未验证）。
+> 下一棒若换机器复现 push 失败，先分别测 `curl https://github.com/` 与 `ssh -T git@github.com`：
+> 一个不通一个通 → 换 SSH 远端即可，不必改仓库内容。
 
 ## 三、覆盖对账
 
@@ -114,12 +209,17 @@
 
 | # | DoD 项 | 本仓落点 | 状态 |
 |---|---|---|---|
-| 1 | 脱敏门 0 命中；`git archive <tag>` 解出树里能跑门 | `tools/check-desensitized.mjs`；解出树复跑记录见 §二 | 实现 |
-| 2 | 干净环境（裸 clone + 无 `node_modules`）按 README 逐条敲通 | §1.3 六步；`bench` 一档**不适用**裸 clone（需真实 `node_modules`） | 实现 |
-| 3 | ① git tag ② GitHub Release（≥1 附件 + 本地副本 + sha256）③ 本文件 | 口径 A：整个 tag 树的 zip，清单见 §1.5 | 实现 |
+| 1 | 脱敏门 0 命中；`git archive <tag>` 解出树里能跑门 | `tools/check-desensitized.mjs`；解出树复跑记录见 §2.3 | 实现 |
+| 2 | 干净环境（裸 clone + 无 `node_modules`）按 README 逐条敲通 | §1.3 八步；`bench` 一档**不适用**裸 clone（需真实 `node_modules`） | 实现 |
+| 3 | ① git tag ② GitHub Release（≥1 附件 + 本地副本 + sha256）③ 本文件 | 口径 A：整个 tag 树的 zip，清单见 §1.5、实跑见 §2.1 | 实现 |
 | 4 | `tools/check-release.mjs` 三档无 FAIL；进 CI 的是跨触发成立那一档 | 离线档挂 CI（`--pre-tag` 在 tag 推送时必红，`--online` 需网络与远端） | 实现 |
-| 5 | CI 实跑（远端，三档 node × 两 OS） | `plan/05` §4 U1/U2；首推后据实补记 run id 与结论 | 待首推 |
+| 5 | CI 实跑（远端，三档 node × 两 OS） | 实跑 run `41322262071`，7 job 全绿，见 §2.2 | 实现 |
 | 6 | npm 发布（`npm publish` 到公共 registry） | **不适用**：本仓的交付形态是「仓库 + Release 附件」，不是 registry 包；`files` 字段只服务将来的可选发布，本轮不执行 | 不适用 |
+
+> **状态列只写三态本身**（`实现` / `不适用` / `待首推`），证据写在前一列。
+> 理由：`tests/release.test.mjs` 逐行断言状态格必须落在三态之内——写"实现（见 §2.2）"
+> 这种带括号的混写会被判成"自造措辞"，而自造措辞正是"没做"藏身的地方。
+> 这不是形式主义：判据要能机器读，就不能允许自由文本混进状态格。
 
 ## 四、发布门三档的适用面（为什么 CI 只能挂一档）
 

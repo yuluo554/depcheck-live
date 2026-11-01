@@ -55,8 +55,14 @@ test("plan/ 下至少有 M0 与 M1 两份入口（阳性对照：判据不是空
 test("★ 每个已开的里程碑（已 ✅ + 当前在做的）都有入口 `HANDOFF-M<k>.md`", () => {
   const { done, current } = milestoneSets();
   assert.ok(done.length > 0, "没推导出任何 ✅ 里程碑 —— 判据空跑");
-  assert.ok(current !== null, "没推导出当前里程碑（全部 ✅ 时本测试应改为只查 done）");
-  const required = [...done, current].sort((a, b) => a - b);
+  // ⚠️ M6 实测修正：这里原先写死 `assert.ok(current !== null, "…全部 ✅ 时本测试应改为只查 done")`
+  //    —— 那句**报错文案自己**就说出了修法，但代码没照做。末棒 M6 翻 ✅ 后 `current === null`，
+  //    整条测试必炸；而布局门 `LAYOUT.HANDOFFS` 同时正确地报"全部已 ✅，无当前里程碑"且全绿。
+  //    **两边判据必须同口径：没有 ⬜ 时，已开的 = done。**
+  //    这属于"判据锚了进度状态"同族（与 mutate-gates 的 H2 那个坑同源）：锚"总会有一个 ⬜"
+  //    就是锚进度，末棒必死。修的是测试，不是门的语义。
+  const required = [...done, ...(current === null ? [] : [current])].sort((a, b) => a - b);
+  assert.ok(required.length > 0, "已开里程碑集合为空 —— 判据空跑");
   const missing = required.filter((k) => !existsSync(join(PLAN_DIR, `HANDOFF-M${k}.md`)));
   assert.deepEqual(
     missing,

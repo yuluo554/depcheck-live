@@ -109,15 +109,47 @@ test("validateFacts：版本三处不一致 / 附件名不含版本号 / 非 zip
   );
 });
 
-test("覆盖对账表：三态行 ≥ 3，且三态各至少出现一次", () => {
+test("覆盖对账表：每行的状态格必须落在三态之一，且至少 3 行", () => {
   const text = docText();
-  const section = text.slice(text.search(/^#{2,3}.*覆盖对账/m) >>> 0);
-  assert.ok(section.length > 0, "找不到覆盖对账小节");
-  const rows = section.match(/^\|.*(实现|不适用|待首推).*\|$/gm) ?? [];
-  assert.ok(rows.length >= 3, `三态行 ${rows.length} 行，要求 ≥ 3`);
-  for (const state of ["实现", "不适用", "待首推"]) {
-    assert.ok(rows.some((r) => r.includes(state)), `覆盖对账表缺『${state}』态行——三态必须都出现，否则『没做』可以靠不写来隐藏`);
+  const start = text.search(/^#{2,3}.*覆盖对账/m);
+  assert.ok(start >= 0, "找不到覆盖对账小节");
+  // 只取**本小节**：截到下一个同级/更高级标题为止。
+  // （首版直接 slice 到文件末尾 → 后面 §四 的表格也会被算进来，判据面混进了别人的表。）
+  const rest = text.slice(start);
+  const endRel = rest.slice(1).search(/^#{2,3}\s/m);
+  const section = endRel < 0 ? rest : rest.slice(0, endRel + 1);
+
+  // ⚠️ M6 实测修正：首版还要求"三态**各至少出现一次**"。那是**锚进度状态**——
+  //    "待首推"在被发布的那一棒里是真实状态，发布做完后它会**合法地全部变成实现**
+  //    （本仓 M6 收尾时正是如此：5 行全是实现，1 行不适用）。要求"待首推必须出现"
+  //    等于要求仓库永远停在一个未完成的状态 = 锚进度（与 K40/K41 同族）。
+  //
+  // 真正的判据是**不许靠不写来隐藏**：每一行的状态格必须明确落在三态之一，
+  // 写"差不多""基本完成"这类自造态即红。这样"没做"藏不住，也不逼仓库假装没做完。
+  const STATUSES = ["实现", "不适用", "待首推"];
+  const lines = section.split("\n");
+  const headerIdx = lines.findIndex((l) => l.startsWith("|") && l.includes("状态"));
+  assert.ok(headerIdx >= 0, "覆盖对账表没有『状态』表头（判据面搬走了？）");
+  const rows = [];
+  for (let i = headerIdx + 2; i < lines.length; i++) {
+    if (!lines[i].startsWith("|")) break;
+    const cells = lines[i].split("|").map((c) => c.trim());
+    const status = cells[cells.length - 2] ?? "";
+    rows.push({ raw: lines[i], status });
   }
+  assert.ok(rows.length >= 3, `覆盖对账表只有 ${rows.length} 行，要求 ≥ 3`);
+  const bad = rows.filter((r) => !STATUSES.includes(r.status));
+  assert.deepEqual(
+    bad.map((r) => r.status),
+    [],
+    `这些行的状态格不在三态之内（${STATUSES.join(" / ")}），『没做』可以靠自造措辞藏起来：` +
+      bad.map((r) => JSON.stringify(r.status)).join(", "),
+  );
+  // 反向：至少有一行是"实现"（真有东西落地），否则整张表可以全是"不适用"空转
+  assert.ok(
+    rows.some((r) => r.status === "实现"),
+    "覆盖对账表里没有『实现』态行 —— 整表可以全是『不适用』而空转",
+  );
 });
 
 test("★ 本地副本若存在，sha256 必须与留档一致（落档前后不一致 = 附件是另一份东西）", () => {

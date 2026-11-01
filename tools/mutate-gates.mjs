@@ -134,22 +134,60 @@ const GROUPS = [
     apply: (cwd) => rmSync(join(cwd, "plan/HANDOFF-M0.md")),
   },
   {
-    id: "H1",
+id: "H1",
     gate: LAYOUT,
     judge: "LAYOUT.HANDOFFS",
     name: "删『当前在做那个里程碑』的入口（半边①：欠账必须红）",
     // 这条钉住本仓真实撞过的缺陷：旧实现 `for (const k of done)` 只枚举已 ✅，
     // 于是"当前里程碑的入口没写"时门照旧全绿（实测报"2 份交接单齐"），
     // 下一棒打开仓库找不到入口。靶子必须是**当前**里程碑（最小的 ⬜），删已 ✅ 的由 L5 管。
+    //
+    // ⚠️ **M6 实测修正**：原靶子直接取"状态表里最小号的 ⬜"，末棒 M6 翻 ✅ 后 `pending` 为空
+    //    → 本组 SKIP（宿主纪律②：SKIP 也算不符合预期）。这与 H2/L8 是**同一族**：
+    //    靶子锚了"总有未完成里程碑"这个进度状态。
+    //
+    // 正解与 H2 一致——**靶子自己造出需要的前置状态**：把状态表里最小那行的 ✅ 翻成 ⬜，
+    // 于是那个里程碑变成"当前在做的"，再删它的入口。这正是半边①要防的真实场景
+    // （"这一棒还在做，但入口没写"）。全 ✅ 仓库与"还剩几个 ⬜"两种形态下都成立。
+    // 顺带说明：翻 ⬜ 会让 LAYOUT.STATUS/LEDGER 也可能红，但那不是本组判据——
+    // 本组只认 `judge` 那一条，另两条红不影响 CAUGHT 判定（门已经红了，正是我们要的）。
     apply: (cwd) => {
-      const text = readFileSync(join(cwd, "plan/05-里程碑与发布.md"), "utf8");
+      const rel05 = "plan/05-里程碑与发布.md";
+      const text = readFileSync(join(cwd, rel05), "utf8");
+      const lines = text.split("\n");
       const pending = [];
-      for (const line of text.split("\n")) {
+      for (const line of lines) {
         const m = /^\|\s*\*{0,2}M(\d+)\b/.exec(line);
         if (m && /[⬜🟡]/.test(line)) pending.push(Number(m[1]));
       }
-      if (pending.length === 0) return { ok: false, why: "没有 ⬜ 里程碑（已全部完成），本组不适用" };
-      const current = Math.min(...pending);
+
+      let current;
+      if (pending.length > 0) {
+        current = Math.min(...pending);
+      } else {
+        // 全部 ✅：把**最小那个里程碑**翻回 ⬜，人为造出"当前里程碑"。
+        // 两个副本都要改（否则跨副本不一致 —— 那会另起一条红，本组判据被淹没）。
+        const lowest = lines
+          .map((line) => /^\|\s*\*{0,2}M(\d+)\b/.exec(line))
+          .filter(Boolean)
+          .map((m) => Number(m[1]))
+          .sort((a, b) => a - b)[0];
+        if (lowest === undefined) return { ok: false, why: "状态表里找不到任何里程碑行（基线就不对）" };
+        current = lowest;
+        for (const rel of [rel05, "plan/00-README总览.md"]) {
+          const abs = join(cwd, rel);
+          if (!existsSync(abs)) return { ok: false, why: `${rel} 不存在` };
+          const src = readFileSync(abs, "utf8").split("\n");
+          const idx = src.findIndex((l) => new RegExp(`^\\|\\s*\\*{0,2}M${lowest}\\b`).test(l) && l.includes("✅"));
+          if (idx < 0) return { ok: false, why: `${rel} 里找不到首格为 M${lowest} 且含 ✅ 的状态行` };
+          const patched = src[idx].replace("✅ 已完成", "⬜ 待 M" + lowest).replace("✅", "⬜");
+          if (patched === src[idx]) return { ok: false, why: `${rel} 的 M${lowest} 行替换后字节未变（no-op）` };
+          const next = [...src];
+          next[idx] = patched;
+          writeFileSync(abs, next.join("\n"));
+        }
+      }
+
       const rel = `plan/HANDOFF-M${current}.md`;
       const abs = join(cwd, rel);
       if (!existsSync(abs)) return { ok: false, why: `${rel} 不存在（基线就没有入口？）` };
