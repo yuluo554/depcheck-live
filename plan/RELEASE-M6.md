@@ -44,29 +44,44 @@
 判据 = **从零 clone 出来的树，只靠 `npm test` 与三条 CLI 命令就能自证**，不预装任何东西。
 本仓零第三方依赖（`dependencies` / `devDependencies` 皆空），所以 `npm install` 一步可省。
 
-| 步骤 | 命令 | 期望 |
+| 步骤 | 命令 | 实测结果（2026-11-01 本机） |
 |---|---|---|
-| 1 | `git clone <url> <中立目录>` | 成功，无 `node_modules` |
-| 2 | `npm test` | 209 passed / 0 failed（逐文件登记，非 glob） |
+| 1 | `git clone <url> <中立目录>` | 成功；树内**无** `node_modules` |
+| 2 | `npm test` | **222 tests / 192 pass / 0 fail / 30 skipped** |
 | 3 | `node bin/depcheck-live.mjs --version` | `depcheck-live 0.1.0` |
-| 4 | `node tools/check-sprint-layout.mjs` | 10 条判据全绿 |
-| 5 | `node tools/check-desensitized.mjs` | 0 命中 |
-| 6 | `node bin/depcheck-live.mjs selftest` | 8/8（现场造最小工程，不依赖本仓路径） |
+| 4 | `node tools/check-sprint-layout.mjs` | 11 条判据全绿 |
+| 5 | `node tools/check-desensitized.mjs` | 0 命中（127 个文本文件） |
+| 6 | `node tools/check-release.mjs` | 全绿（离线档） |
+| 7 | `node bin/depcheck-live.mjs selftest` | 8/8（现场造最小工程，不依赖本仓路径） |
+| 8 | `node bin/depcheck-live.mjs check .` | **退出码 3**（`NO_NODE_MODULES`——"算不了"，不是"没事"） |
+
+> **30 条 skip 是设计，不是欠债。** 它们全部是"需要真实五包"的那一档
+> （`tests/fixtures-run.test.mjs` / `tests/bench.test.mjs` / `tests/fingerprints.test.mjs`），
+> 代码里**显式 `t.skip(...)` 并在理由里写明缺什么**，不假装通过。
+> 这也是第 8 步为什么回 3：没有 `node_modules` 时"零命中"与"算不了"必须落在不同退出码
+> （`data/README.md` §5.1）。**把 30 条 skip 读成 30 条 pass 是假绿**——本节据实写 skip 数。
 
 > `bench` / `bench --clean` **不进**这一档：它们面对的是真实 `node_modules`（五包），
 > 裸 clone 里没有装。这是**设计**，不是遗漏——`bench` 的可信度恰恰来自"面对真实依赖"，
 > 用 mock 换来的绿没有证据力（`plan/04` §3）。
+> 装包后（`npm i --no-save chalk@6 zod@4 date-fns@4 commander@15 glob@14`）那 30 条会转为实跑，
+> 本机在装包状态下实测 **222 / 222 pass / 0 skip**。
 
 ### 1.4 三道具实测（tag 前）
 
-| 道具 | 命令 | 结果 |
+| 道具 | 命令 | 结果（本机，2026-11-01，Node v24.15.0） |
 |---|---|---|
-| 单元/契约测试 | `npm test` | **209 / 209** |
-| 布局门 | `node tools/check-sprint-layout.mjs` | **11 条全绿**（M6 新增 `LAYOUT.RELEASE` 判据变活） |
-| 脱敏门 | `node tools/check-desensitized.mjs` | **0 命中** |
-| 变异宿主（两道门） | `node tools/mutate-gates.mjs` | **20 / 20 CAUGHT** |
-| 契约变异 | `node tools/verify-contract-mutations.mjs` | **11 / 11 CAUGHT** |
+| 单元/契约测试 | `npm test` | **222 / 222**（M5 收尾 209，M6 新增 13） |
+| 布局门 | `node tools/check-sprint-layout.mjs` | **10 条全绿**（`LAYOUT.RELEASE` 在 M6 翻 ✅ 后变活，见 §二） |
+| 脱敏门 | `node tools/check-desensitized.mjs` | **0 命中**（127 个文本文件） |
 | 发布门（离线档） | `node tools/check-release.mjs` | **全绿** |
+| 发布门（tag 前档） | `node tools/check-release.mjs --pre-tag` | **全绿**（`v0.1.0` 尚未创建） |
+| 发布门（联网档） | `node tools/check-release.mjs --online` | tag 前 FAIL（缺 sha256）+ UNKNOWN（无 origin）→ **退出码 1**，属预期 |
+| 变异宿主（三道门） | `node tools/mutate-gates.mjs` | **26 / 26 CAUGHT**（M5 时 20 组，M6 新增 R1–R6） |
+| 契约变异 | `node tools/verify-contract-mutations.mjs` | **11 / 11 CAUGHT** |
+
+> `--online` 在 tag 前失败**不是缺陷**：它的判据要求"附件已在远端且 sha256 能回取闭环"，
+> tag 未创建时这个前提不成立。三档各自的前提与适用面见 §四。
 
 ### 1.5 附件清单（口径 A 定稿）
 
