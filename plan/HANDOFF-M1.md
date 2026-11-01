@@ -17,12 +17,12 @@ M1 已全部完成。逐项证据（全部为**本机实跑**，2026-11-01，Nod
 | §5.3 三阈值回填 | `data/README.md` §5.3 + §5.3.1（实测依据） | 欠债清零；`src/contract.mjs` `LIMITS` 镜像 |
 | 阈值落进实现 | `buildExportsIndex` / `scanSources` / `findBarePackageLiterals` | `tests/thresholds.test.mjs`（7 条，含双向断言） |
 | 六份语料骨架 | `fixtures/<case>/INPUT.md` + `expected.json`（C1–C7） | `tests/fixtures.test.mjs`（9 条） |
-| 测试总账 | `tests/` 9 个文件 | `npm test` → **99 passed / 0 failed / 0 skipped** |
-| 脱敏门跳过名单对齐 | `tools/check-desensitized.mjs` 的 `SKIP_DIRS` | `tests/gate-selfcheck.test.mjs` 读 `.gitignore` 逐条对账；扫描数 137 → **59** |
+| 测试总账 | `tests/` 10 个文件 | `npm test` → **104 passed / 0 failed / 0 skipped** |
+| 脱敏门跳过名单对齐 | `tools/check-desensitized.mjs` 的 `SKIP_DIRS` | `tests/gate-selfcheck.test.mjs` 读 `.gitignore` 逐条对账；扫描数 137 → **60** |
 | 三道门 | layout / desensitized / mutations | 见 §六 |
 
-**M1 实测数字**：`npm test` = **99 passed / 0 failed / 0 skipped**（M0 是 55）；
-`gen-fingerprints --check` = **5/5 逐字节一致**；脱敏门扫 **59** 个文本文件 0 命中；
+**M1 实测数字**：`npm test` = **104 passed / 0 failed / 0 skipped**（M0 是 55）；
+`gen-fingerprints --check` = **5/5 逐字节一致**；脱敏门扫 **60** 个文本文件 0 命中；
 布局门 **10 条判据**；变异组 **18**（15 正 + 2 阴性对照 + 1 跳过目录绿对照）。
 
 ### 招牌发现：M0 骨架的 10 处语义偏差（本轮最重要的产出）
@@ -90,11 +90,43 @@ M1 收尾核对时发现脱敏门的扫描数从 **70** 跳到 **137** 个文件
 > （`git checkout` 恢复的是已提交版本，不是"我改之前的状态"）。
 > 正确做法：**在临时副本里做破坏性验证**（如上），或用 `git stash`。已重做并复验。
 
-### 招牌发现汇总（M1 三条）
+### 第四个发现：交接单「下一棒启动命令」的 off-by-one（用户实测撞到）
+
+用户按 M0 收尾给的命令 `/goal 读取 "…\plan\HANDOFF-M1.md"` 启动本棒时，
+`HANDOFF-M1.md` **还不存在** —— 于是本棒被迫从零重建状态（读 README + plan/00/05/06 + M0 交接单）。
+
+**根因不是"M1 忘了写 HANDOFF-M2"**，而是这条启动命令本身错：
+`HANDOFF-M<k>` 的 `k` = **刚完成的里程碑号**（`AGENTS.md` §一/§二 + 每份交接单第 4 行的自我声明），
+**下一棒的待办就写在本文件 §三 里**，所以启动命令必须指向**本文件自己**。
+
+- M0 写成了 `HANDOFF-M1.md`（当时不存在）→ 用户读到空。
+- M1 **照抄了这个 bug**，写成 `HANDOFF-M2.md`（现在同样不存在）→ 下一棒会再撞一次。
+
+修法：两处指针都改为指向自己（M0 那处按"追加事实、不回填美化"记更正，不篡改原文）；
+并把口径变成机器判据 —— `tests/handoff-pointer.test.mjs`（5 条）：
+
+| 判据 | 防什么 |
+|---|---|
+| 启动命令行必须指向**本文件自己的编号** | off-by-one（本次缺陷） |
+| 启动命令行引用的文件必须**当前存在** | 读空文件 |
+| 标题编号 == 文件名编号 | 复制上一份后忘改标题 |
+| 每份都有 "k = 刚完成的里程碑号" 口径声明 | 口径漂移（它是"指向自己"的依据） |
+| 至少两份交接单（阳性对照） | 判据空跑 |
+
+**非空转已实测证明**（临时副本里做）：把 M1 的启动命令改回 `HANDOFF-M2.md`
+→ 基线 5 pass / 0 fail 变成 **3 pass / 2 fail**，报错精确指出
+「HANDOFF-M1.md 的「下一棒启动命令」指向 HANDOFF-M2，应指向本文件 HANDOFF-M1」。
+
+> ⚠️ 判据面只取**启动命令那一行**，不扫全文：`§三 下一棒待办` 里写
+> 「M2 收尾时写 `plan/HANDOFF-M2.md`」是**正当的前瞻引用**，把它判红就是靶子瞄错
+> （同族：本文件 §五 记的"变异靶子必须落在判据的实际扫描面上"）。
+
+### 招牌发现汇总（M1 四条）
 
 1. M0 的 `resolve.mjs` 有 **10 处**与 Node 官方解析算法不符（已全部修正，`data/README.md` §5.4）
 2. M0 把 `chalk` 与 `commander` 记成同类 —— 实测判定**相反**（§5.4.1）
 3. 脱敏门的 `SKIP_DIRS` 漏了 `.gitignore` 声明的本地目录（已修 + 变成机器判据）
+4. 交接单「下一棒启动命令」off-by-one（已修 + 变成机器判据 `tests/handoff-pointer.test.mjs`）
 
 ## 二、当前事实 · 状态不变量（下一棒动手前必须知道）
 
@@ -123,9 +155,12 @@ M1 收尾核对时发现脱敏门的扫描数从 **70** 跳到 **137** 个文件
    M2 必须按 case 所属里程碑补齐：C1–C5 在 M2、C6 在 M3、C7 在 M4。
 10. **M1 不伪造历史指纹**。C6（`drift`）的旧版本一侧必须由用户显式提供的离线包填充，
     M1 只定义判定形状。**伪造历史指纹 = 伪造真值**。
+    同族纪律：**不要为了"让指针看起来对"去补写下一棒的交接单**——
+    现在写 `HANDOFF-M2.md` 等于提前伪造 M2 的收尾记录（M2 的 DoD 一条都还没做）。
+    正确做法是修指针，让启动命令指回本文件。
 11. **`PENDING_TOOLS` 当前只剩 1 条**：`tools/check-release.mjs`(M6)。
     `gen-fingerprints.mjs` 那条已随落位同笔删除（K10 纪律）。
-12. **`tests/` 现在是 9 个文件**，两处登记（`package.json` `scripts.test` + `.github/workflows/ci.yml`）
+12. **`tests/` 现在是 10 个文件**，两处登记（`package.json` `scripts.test` + `.github/workflows/ci.yml`）
     已同步。**新增测试文件必须同笔登记两处**，否则 `LAYOUT.TESTS` 红。
 13. **本仓库根现在有 `node_modules/`**（M1 为跑 `--check` 与真实包实测装的，
     `npm i --no-save`，**未写进 `package.json`**）。它被 `.gitignore` 封，不影响零依赖承诺；
@@ -143,7 +178,7 @@ M1 收尾核对时发现脱敏门的扫描数从 **70** 跳到 **137** 个文件
 
 按序执行，不跳步：
 
-1. **先跑 D1 回归**：`npm test`（期望 99/99）+ `node tools/gen-fingerprints.mjs --check`（期望 5/5）。
+1. **先跑 D1 回归**：`npm test`（期望 104/104）+ `node tools/gen-fingerprints.mjs --check`（期望 5/5）。
    D1 的 10 条若被改回旧口径，`tests/resolve.test.mjs` 会立刻红——**别改测试去迁就实现**。
 2. **补 `fixtures/*/expected.json` 的逐点 evidence**（C1–C5 归 M2）：每项给出
    `exports` 字段原文片段 + 入口目标文件里的导出行号。这是 `data/README` §5.4 与语料之间的可执行链接。
@@ -157,7 +192,8 @@ M1 收尾核对时发现脱敏门的扫描数从 **70** 跳到 **137** 个文件
    真正的源码文件（`src/against-chalk.cjs` 等）与每 case 的 `package.json` 要在 M2 建。
 6. **超长行降级路径验证**：`LARGE_FILE_DOWNGRADED` 的 gap 目前只在 `scanSources` 里按字节数判，
    M2 要有一个真实 >512 KiB 的文件用例证明它真的进了 gaps。
-7. **收尾**：DoD 验证 → `plan/00`/`05`/`06` 状态回写 → 写 `plan/HANDOFF-M2.md` → commit。
+7. **收尾**：DoD 验证 → `plan/00`/`05`/`06` 状态回写 → **写 `plan/HANDOFF-M2.md`（M2 收尾时才写，
+   不是现在）** → commit。写完把 `plan/HANDOFF-M2.md` 的「下一棒启动命令」指向**它自己**。
 
 ## 四、既定口径清单（动了会打挂测试的约定，K 编号）
 
@@ -174,6 +210,7 @@ M0 的 K1–K11 全部继续有效（见 `plan/HANDOFF-M0.md` §四），M1 新�
 | K18 | 五包指纹件**禁手改**；改它只能改生成器 + 重跑 `--check` | `tools/gen-fingerprints.mjs` | `tools/gen-fingerprints.mjs --check` + `tests/fingerprints.test.mjs` |
 | K19 | 脱敏门 `SKIP_DIRS` 必须覆盖 `.gitignore` 的每个本地目录 | `tools/check-desensitized.mjs` | `tests/gate-selfcheck.test.mjs`（逐条对账）+ 变异组 D5 |
 | K20 | 破坏性验证在临时副本里做，不用 `git checkout` 恢复工作树 | 约定（见 §二.15） | —（操作纪律，机器判不了） |
+| K21 | `HANDOFF-M<k>` 的 `k` = 刚完成的里程碑号；「下一棒启动命令」必须指向**本文件自己** | 约定 + `AGENTS.md` §一 | `tests/handoff-pointer.test.mjs`（5 条） |
 
 ## 五、本机环境坑（只写实测过的，2026-11-01）
 
@@ -204,10 +241,11 @@ M0 的 K1–K11 全部继续有效（见 `plan/HANDOFF-M0.md` §四），M1 新�
 | 3 | 六份 `fixtures/*/INPUT.md` + `expected.json` 定稿 | ✅ | C1–C7 齐；每份声明验证哪条 + 为什么能证伪；`tests/fixtures.test.mjs` 9 条 |
 | 4 | 生成器产出确定：`--check` 逐字节一致（双跑比对） | ✅ | `gen-fingerprints --check: 5/5 份逐字节一致` |
 | 5 | 口径回填：§5.3 三行改具体数值（欠债清零） | ✅ | 4096 键 / 512 KiB / 双条件；`LIMITS` 镜像；`tests/thresholds.test.mjs` 双向 |
-| 6 | `npm test` 本地全绿 | ✅ | **99 passed / 0 failed / 0 skipped** |
+| 6 | `npm test` 本地全绿 | ✅ | **104 passed / 0 failed / 0 skipped** |
 | 7 | 三道门全绿 | ✅ | layout 10 条 PASS / desensitized 0 命中 / mutations 18 组符合预期 |
 | 8 | 状态副本三处一致 | ✅ | `plan/00` §4 + `plan/05` §1 + `plan/00` §3 台账；`LAYOUT.STATUS` + `LAYOUT.LEDGER` PASS |
 | 9 | CI 实跑 | ⬜ **不适用** | 无远端，**未跑 CI**；本地等价校验见 §一 |
+| 10 | 交接单指针指向**本文件自己**（用户实测撞到的缺陷） | ✅ | 两处指针已修；`tests/handoff-pointer.test.mjs` 5 条；非空转已证（改回 M2 → 2 红） |
 
 > 第 9 项按诚实口径写：**无远端 = 未跑 CI**，不得写"CI 绿"。
 > M6 首推后据实补记真实 run id（补记是追加事实，不回填美化本节措辞）。
@@ -221,7 +259,7 @@ node tools/check-desensitized.mjs       # 脱敏门，期望 0 命中
 node tools/mutate-gates.mjs             # 变异验证，期望 18/18 符合预期
 
 # 测试
-npm test                                # 期望 99/99（M2 起会增加）
+npm test                                # 期望 104/104（M2 起会增加）
 
 # 指纹（M1 新增）
 node tools/gen-fingerprints.mjs --list              # 列五包 + 指纹，不读写文件
@@ -243,5 +281,9 @@ npx -y node@20 --test tests/cli.test.mjs
 ```
 
 **下一棒启动命令（用户侧）**：
-`/goal 读取 "<项目绝对路径>\plan\HANDOFF-M2.md" 继续完成任务`
-——前提是本棒收尾已写出 `plan/HANDOFF-M2.md`。
+`/goal 读取 "<项目绝对路径>\plan\HANDOFF-M1.md" 继续完成任务`
+
+—— **就读本文件**（`plan/HANDOFF-M1.md`）。`HANDOFF-M<k>` 的 `k` 是**刚完成的里程碑号**，
+所以下一棒的待办写在**本文件 §三**里；下一棒收尾时才写 `plan/HANDOFF-M2.md`。
+⚠️ 此处曾是 off-by-one 缺陷：M0 写成 `HANDOFF-M1.md`（当时不存在），M1 照抄成 `HANDOFF-M2.md`
+—— 导致下一棒读空文件、被迫从零重建状态。已由 `tests/handoff-pointer.test.mjs` 钉住。

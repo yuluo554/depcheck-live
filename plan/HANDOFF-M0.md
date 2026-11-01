@@ -177,5 +177,12 @@ npx -y node@20 --test tests/cli.test.mjs
 ```
 
 **下一棒启动命令（用户侧）**：
-`/goal 读取 "<项目绝对路径>\plan\HANDOFF-M1.md" 继续完成任务`
-——前提是本棒收尾已写出 `plan/HANDOFF-M1.md`。
+`/goal 读取 "<项目绝对路径>\plan\HANDOFF-M0.md" 继续完成任务`
+
+—— **就读本文件**（`plan/HANDOFF-M0.md`）。`HANDOFF-M<k>` 的 `k` 是**刚完成的里程碑号**，
+下一棒的待办写在**本文件 §三**里；下一棒收尾时才写 `HANDOFF-M<k+1>.md`。
+
+> ⚠️ **更正（M1 收尾追加）**：本节原文写的是 `HANDOFF-M1.md`，那是 off-by-one 错误——
+> 当时该文件不存在，导致下一棒读到空文件、被迫从零重建状态。原措辞保留在 git 历史里
+> （`02bea05` 之前），此处按"追加事实、不回填美化"的纪律更正。
+> 该缺陷已由 `tests/handoff-pointer.test.mjs` 钉住，不再靠人记。

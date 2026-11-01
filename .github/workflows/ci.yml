@@ -57,6 +57,7 @@ jobs:
           node --test
           tests/architecture.test.mjs
           tests/gate-selfcheck.test.mjs
+          tests/handoff-pointer.test.mjs
           tests/paths.test.mjs
           tests/resolve.test.mjs
           tests/scan.test.mjs
