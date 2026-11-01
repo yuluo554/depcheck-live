@@ -65,12 +65,25 @@ const REQUIRED_SECTIONS = {
 /** HANDOFF 七节（SKILL.md 硬约束①）。断言"必需节都在"，不断言"节数恰好 7"（超集合法）。 */
 const HANDOFF_SECTIONS = ["当前进度", "当前事实", "下一棒待办", "既定口径", "环境坑", "DoD", "命令速查"];
 
-/** 已声明的豁免与冻结规则——门必须复用项目自己的声明，别另立更严的一套。
- *  M0 **不豁免**（AGENTS.md §二 第 2 条：让 HANDOFF 判据从第一天起就有活靶子）。 */
+/**
+ * 交接单命名口径（K21，2026-11-01 用户订正）：`plan/HANDOFF-M<k>.md` 是 **M<k> 的入口文件**，
+ * `k` = **它开的那一棒**，不是"写完它的那一棒"。
+ *
+ * ⚠️ 旧实现是 `for (const k of done)` —— 只要求已 ✅ 的里程碑有交接单。
+ *    于是"M1 收尾却没写 `HANDOFF-M2.md`"时门照旧全绿（报"2 份交接单齐"），
+ *    而下一棒打开仓库**找不到入口**（本仓 `02bea05`–`5c0097a` 期间正是这个缺陷）。
+ *    **修法是改门，不是让语义去迁就门的漏洞**——那条教训已写进 AGENTS.md §一。
+ *
+ * 判据两半边，缺一条就是假门：
+ *   ① `done ∪ {current}` 每个里程碑都要有入口且七节齐（`current` = 最小的 ⬜）；
+ *   ② `milestones \ done \ {current}` **不许**有入口文件（超前入口 → 红）。
+ */
 const EXEMPT_MILESTONES = [];
 const HANDOFF_FORMAT_FROM = 0;
 /** 末棒要不要交接单：false = 要（写"收官交接单"）。 */
 const HANDOFF_EXEMPT_LAST = false;
+/** 已开但被显式豁免入口的里程碑（本项目为空；末棒由 HANDOFF_EXEMPT_LAST 单独管）。 */
+const HANDOFF_EXEMPT_ENTRY = [];
 
 /**
  * 状态副本 = **2 张表**；`plan/00` 的承诺-证据台账由 LAYOUT.LEDGER 单独判 → 合计 3 处。
@@ -185,16 +198,35 @@ function checkStatusAgreement({ states, rowsByCopy }) {
   );
 }
 
+/**
+ * 交接单判据（K21 两半边）。`current` = `done` 之外的最小号（= 当前在做的里程碑）。
+ *
+ * 半边①：`done ∪ {current}` 每个都要有入口、且七节齐（缺 = 欠账，红）。
+ * 半边②：其余里程碑（⬜ 且非 current）**不许**有入口（超前入口 = 把"未执行"写成"已完成"，红）。
+ *
+ * 两半边都进结论行，且打印"扫到几个"——半边②若从不被断言，"超前入口"整族会静默放行。
+ */
 function checkHandoffs(done, allMilestones) {
   const last = Math.max(0, ...allMilestones);
+  const pending = allMilestones.filter((k) => !done.includes(k)).sort((a, b) => a - b);
+  const current = pending.length > 0 ? pending[0] : null;
+
   const missing = [];
-  for (const k of done) {
-    if (EXEMPT_MILESTONES.includes(k)) continue;
-    if (HANDOFF_EXEMPT_LAST && k === last) continue;
+  const premature = [];
+
+  // ── 半边①：已开的里程碑（已 ✅ + 当前在做的那个）必须有入口 ──
+  for (const k of [...done, ...(current === null ? [] : [current])].sort((a, b) => a - b)) {
+    if (EXEMPT_MILESTONES.includes(k) || HANDOFF_EXEMPT_ENTRY.includes(k)) continue;
+    if (HANDOFF_EXEMPT_LAST && k === last && k !== current) continue;
     const rel = `plan/HANDOFF-M${k}.md`;
     const text = read(rel);
     if (text === null) {
-      missing.push(`${rel}(缺${k === last ? "：末棒要么写收官交接单，要么置 HANDOFF_EXEMPT_LAST 并在 AGENTS.md 说明" : ""})`);
+      const which = done.includes(k) ? "已 ✅" : "当前在做";
+      const tail =
+        k === last && HANDOFF_EXEMPT_LAST === false
+          ? "：末棒要么写收官交接单，要么置 HANDOFF_EXEMPT_LAST 并在 AGENTS.md 说明"
+          : "";
+      missing.push(`${rel}(缺：M${k} 是${which}的里程碑，入口文件必须存在${tail})`);
       continue;
     }
     scanned.handoffs += 1;
@@ -202,11 +234,35 @@ function checkHandoffs(done, allMilestones) {
     const lack = HANDOFF_SECTIONS.filter((n) => !text.includes(n));
     if (lack.length) missing.push(`${rel}(缺节: ${lack.join("/")})`);
   }
-  const tail = `M0 未豁免${HANDOFF_EXEMPT_LAST ? "；末棒已豁免" : ""}`;
+
+  // ── 半边②：不得超前（给没开工的里程碑预写入口 → 红）──
+  const openedNotCurrent = allMilestones.filter((k) => !done.includes(k) && k !== current);
+  for (const k of openedNotCurrent) {
+    if (read(`plan/HANDOFF-M${k}.md`) !== null) {
+      premature.push(`plan/HANDOFF-M${k}.md(超前入口：M${k} 仍是 ⬜ 且非当前里程碑 M${current})`);
+    }
+  }
+  // 反向：README/状态表外的野编号（如 HANDOFF-M9.md）也算超前
+  const handoffOnDisk = existsSync(join(ROOT, "plan"))
+    ? readdirSync(join(ROOT, "plan")).filter((f) => /^HANDOFF-M(\d+)\.md$/.test(f))
+    : [];
+  for (const f of handoffOnDisk) {
+    const k = Number(f.match(/HANDOFF-M(\d+)/)[1]);
+    if (!allMilestones.includes(k) && read(`plan/${f}`) !== null) {
+      premature.push(`plan/${f}(超前入口：M${k} 不在这 7 个里程碑里)`);
+    }
+  }
+
+  const problems = [...missing, ...premature];
+  const tier1 = `${scanned.handoffs} 份入口覆盖 ${[...done, ...(current === null ? [] : [current])].length} 个已开里程碑`;
+  const tier2 = `超前扫描 ${allMilestones.length - [...done, ...(current === null ? [] : [current])].length} 个未开工里程碑`;
+  const cursor = current === null ? "全部已 ✅，无当前里程碑" : `当前里程碑 M${current}`;
   add(
     "LAYOUT.HANDOFFS",
-    missing.length === 0,
-    missing.length ? missing.join("；") : `${scanned.handoffs} 份交接单齐（${tail}；已扫 ${done.length} 个 ✅ 里程碑）`,
+    problems.length === 0,
+    problems.length
+      ? problems.join("；")
+      : `${tier1}（${cursor}）｜${tier2} 均无入口｜M0 未豁免${HANDOFF_EXEMPT_LAST ? "；末棒已豁免" : ""}`,
   );
 }
 

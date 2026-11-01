@@ -123,6 +123,57 @@ const GROUPS = [
     apply: (cwd) => rmSync(join(cwd, "plan/HANDOFF-M0.md")),
   },
   {
+    id: "H1",
+    gate: LAYOUT,
+    judge: "LAYOUT.HANDOFFS",
+    name: "删『当前在做那个里程碑』的入口（半边①：欠账必须红）",
+    // 这条钉住本仓真实撞过的缺陷：旧实现 `for (const k of done)` 只枚举已 ✅，
+    // 于是"当前里程碑的入口没写"时门照旧全绿（实测报"2 份交接单齐"），
+    // 下一棒打开仓库找不到入口。靶子必须是**当前**里程碑（最小的 ⬜），删已 ✅ 的由 L5 管。
+    apply: (cwd) => {
+      const text = readFileSync(join(cwd, "plan/05-里程碑与发布.md"), "utf8");
+      const pending = [];
+      for (const line of text.split("\n")) {
+        const m = /^\|\s*\*{0,2}M(\d+)\b/.exec(line);
+        if (m && /[⬜🟡]/.test(line)) pending.push(Number(m[1]));
+      }
+      if (pending.length === 0) return { ok: false, why: "没有 ⬜ 里程碑（已全部完成），本组不适用" };
+      const current = Math.min(...pending);
+      const rel = `plan/HANDOFF-M${current}.md`;
+      const abs = join(cwd, rel);
+      if (!existsSync(abs)) return { ok: false, why: `${rel} 不存在（基线就没有入口？）` };
+      rmSync(abs);
+      return { ok: true };
+    },
+  },
+  {
+    id: "H2",
+    gate: LAYOUT,
+    judge: "LAYOUT.HANDOFFS",
+    name: "给还没开工的里程碑预写入口（半边②：超前入口必须红）",
+    // 半边②若从不被断言，"给没跑的棒预写当前进度+证据"整族会静默放行。
+    // 靶子 = 当前里程碑之后的那个 ⬜（如当前是 M2 就造 HANDOFF-M3.md）。
+    apply: (cwd) => {
+      const text = readFileSync(join(cwd, "plan/05-里程碑与发布.md"), "utf8");
+      const pending = [];
+      for (const line of text.split("\n")) {
+        const m = /^\|\s*\*{0,2}M(\d+)\b/.exec(line);
+        if (m && /[⬜🟡]/.test(line)) pending.push(Number(m[1]));
+      }
+      if (pending.length < 2) return { ok: false, why: "未开工的里程碑不足 2 个，本组不适用" };
+      const future = Math.min(...pending.filter((k) => k !== Math.min(...pending)));
+      const rel = join(cwd, "plan", `HANDOFF-M${future}.md`);
+      if (existsSync(rel)) return { ok: false, why: `plan/HANDOFF-M${future}.md 已存在（基线就有超前入口？）` };
+      writeFileSync(
+        rel,
+        `# HANDOFF-M${future}\n\n## 一、当前进度 + 证据\n\n（这条是变异靶子：给还没开工的里程碑预写入口）\n\n` +
+          "## 二、当前事实 · 状态不变量\n## 三、下一棒待办\n## 四、既定口径清单\n" +
+          "## 五、本机环境坑\n## 六、DoD 逐项 checklist\n## 七、关键命令速查\n",
+      );
+      return { ok: true };
+    },
+  },
+  {
     id: "L6",
     gate: LAYOUT,
     judge: "LAYOUT.GAPS",
