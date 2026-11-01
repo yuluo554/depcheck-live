@@ -17,12 +17,13 @@ M1 已全部完成。逐项证据（全部为**本机实跑**，2026-11-01，Nod
 | §5.3 三阈值回填 | `data/README.md` §5.3 + §5.3.1（实测依据） | 欠债清零；`src/contract.mjs` `LIMITS` 镜像 |
 | 阈值落进实现 | `buildExportsIndex` / `scanSources` / `findBarePackageLiterals` | `tests/thresholds.test.mjs`（7 条，含双向断言） |
 | 六份语料骨架 | `fixtures/<case>/INPUT.md` + `expected.json`（C1–C7） | `tests/fixtures.test.mjs`（9 条） |
-| 测试总账 | `tests/` 8 个文件 | `npm test` → **95 passed / 0 failed / 0 skipped** |
+| 测试总账 | `tests/` 9 个文件 | `npm test` → **99 passed / 0 failed / 0 skipped** |
+| 脱敏门跳过名单对齐 | `tools/check-desensitized.mjs` 的 `SKIP_DIRS` | `tests/gate-selfcheck.test.mjs` 读 `.gitignore` 逐条对账；扫描数 137 → **59** |
 | 三道门 | layout / desensitized / mutations | 见 §六 |
 
-**M1 实测数字**：`npm test` = **95 passed / 0 failed / 0 skipped**（M0 是 55）；
-`gen-fingerprints --check` = **5/5 逐字节一致**；脱敏门扫 **69** 个文本文件 0 命中；
-布局门 **10 条判据**；变异组 **17**（15 正 + 2 阴性对照）。
+**M1 实测数字**：`npm test` = **99 passed / 0 failed / 0 skipped**（M0 是 55）；
+`gen-fingerprints --check` = **5/5 逐字节一致**；脱敏门扫 **59** 个文本文件 0 命中；
+布局门 **10 条判据**；变异组 **18**（15 正 + 2 阴性对照 + 1 跳过目录绿对照）。
 
 ### 招牌发现：M0 骨架的 10 处语义偏差（本轮最重要的产出）
 
@@ -59,6 +60,42 @@ require("commander")  → ns.Command === function；ns.default === undefined   �
 不是装饰条款——**只看第 2 条会把 `commander` 误判成 MISMATCH（系统性假阳性）**。
 记录在 `data/README.md` §5.4.1，C3 语料用"1 红 4 绿"形状钉住。
 
+### 第三个发现：脱敏门的 `SKIP_DIRS` 与 `.gitignore` 不对齐（收尾自检抓到的真缺陷）
+
+M1 收尾核对时发现脱敏门的扫描数从 **70** 跳到 **137** 个文件。查明原因：
+`.mimosa/`（工具 hook 的会话状态目录，79 个文件）已在 `.gitignore` 里声明，
+但**没进**脱敏门的 `SKIP_DIRS`。
+
+这不是笔误——门自己在源码注释第 ④ 条就写着「`.gitignore` 声明的每个本地目录这里都要有对应项」，
+**但这条纪律靠人记**。它今天恰好没有命中项，所以门照绿；那只是运气，
+会话状态里随时可能写入本机绝对路径。
+
+修法与自证（都不是"改一行算完"）：
+
+| 动作 | 落在哪 | 自证方式 |
+|---|---|---|
+| 补齐 `SKIP_DIRS`（14 项：`.mimosa`/`.vscode`/`.idea` + Python 模板残留段 11 项） | `tools/check-desensitized.mjs` | 扫描数从 137 → 59（= 去掉本地环境文件） |
+| 把纪律变成机器判据 | `tests/gate-selfcheck.test.mjs`（4 条） | 读 `.gitignore` 逐条对账，漏一项即红；另有一条钉住 `.mimosa` 不许删回去 |
+| 加一组变异证明判据非空转 | `tools/mutate-gates.mjs` D5 | 见下 |
+
+**D5 非空转已实测证明**（在临时副本里做，不碰工作树）：
+
+```
+无 .mimosa 时基线        : 扫 36 个文件，0 命中
+从 SKIP_DIRS 移除 .mimosa : 扫 37 个文件，1 处命中 → FAIL .mimosa/hook-state/leak.txt [absolute-session-path]  rc=1
+```
+
+> ⚠️ **本轮踩过的操作坑**：为做上面这个验证，我先在工作树里直接改了门文件再用
+> `git checkout tools/check-desensitized.mjs` 恢复 —— 结果把**本轮尚未提交的两处修改一起冲掉了**
+> （`git checkout` 恢复的是已提交版本，不是"我改之前的状态"）。
+> 正确做法：**在临时副本里做破坏性验证**（如上），或用 `git stash`。已重做并复验。
+
+### 招牌发现汇总（M1 三条）
+
+1. M0 的 `resolve.mjs` 有 **10 处**与 Node 官方解析算法不符（已全部修正，`data/README.md` §5.4）
+2. M0 把 `chalk` 与 `commander` 记成同类 —— 实测判定**相反**（§5.4.1）
+3. 脱敏门的 `SKIP_DIRS` 漏了 `.gitignore` 声明的本地目录（已修 + 变成机器判据）
+
 ## 二、当前事实 · 状态不变量（下一棒动手前必须知道）
 
 1. **`data/README.md` §5.4 的 10 条 = 判定面唯一实现依据**。`src/resolve.mjs` 已按官方算法重写。
@@ -88,17 +125,25 @@ require("commander")  → ns.Command === function；ns.default === undefined   �
     M1 只定义判定形状。**伪造历史指纹 = 伪造真值**。
 11. **`PENDING_TOOLS` 当前只剩 1 条**：`tools/check-release.mjs`(M6)。
     `gen-fingerprints.mjs` 那条已随落位同笔删除（K10 纪律）。
-12. **`tests/` 现在是 8 个文件**，两处登记（`package.json` `scripts.test` + `.github/workflows/ci.yml`）
+12. **`tests/` 现在是 9 个文件**，两处登记（`package.json` `scripts.test` + `.github/workflows/ci.yml`）
     已同步。**新增测试文件必须同笔登记两处**，否则 `LAYOUT.TESTS` 红。
 13. **本仓库根现在有 `node_modules/`**（M1 为跑 `--check` 与真实包实测装的，
     `npm i --no-save`，**未写进 `package.json`**）。它被 `.gitignore` 封，不影响零依赖承诺；
     但 `node_modules` 存在会让 `depcheck-live check .` 自身扫到真实包。**别把它当交付面。**
+14. **脱敏门的 `SKIP_DIRS` 必须与 `.gitignore` 的本地目录对齐**（门注释第 ④ 条）。
+    新增一个 `.gitignore` 本地目录 → 同一笔加进 `SKIP_DIRS`，否则
+    `tests/gate-selfcheck.test.mjs` 会红（它读 `.gitignore` 逐条对账，不靠人记）。
+    `.mimosa` 那条尤其别删回去——变异组 D5 用"在 `.mimosa/` 里放假命中项、期望门保持绿"
+    钉住它；D5 是**期望绿**的组，判定它非空转的方式见本文件 §一 第三个发现。
+15. **做破坏性验证别在工作树里改文件再用 `git checkout` 恢复**：本仓当前没有"改之前的快照"，
+    `git checkout <file>` 恢复的是**已提交版本**，会把本轮未提交的修改一起冲掉（M1 踩过）。
+    正解：复制到临时目录验证（`tools/mutate-gates.mjs` 就是这么做的），或先 `git stash`。
 
 ## 三、下一棒待办（M2 解析层）
 
 按序执行，不跳步：
 
-1. **先跑 D1 回归**：`npm test`（期望 95/95）+ `node tools/gen-fingerprints.mjs --check`（期望 5/5）。
+1. **先跑 D1 回归**：`npm test`（期望 99/99）+ `node tools/gen-fingerprints.mjs --check`（期望 5/5）。
    D1 的 10 条若被改回旧口径，`tests/resolve.test.mjs` 会立刻红——**别改测试去迁就实现**。
 2. **补 `fixtures/*/expected.json` 的逐点 evidence**（C1–C5 归 M2）：每项给出
    `exports` 字段原文片段 + 入口目标文件里的导出行号。这是 `data/README` §5.4 与语料之间的可执行链接。
@@ -127,6 +172,8 @@ M0 的 K1–K11 全部继续有效（见 `plan/HANDOFF-M0.md` §四），M1 新�
 | K16 | 字符串兜底 = 双条件（形似包名 **且** 命中已装依赖）+ 按 `file+line+specifier` 去重 | `src/scan.mjs` `findBarePackageLiterals` | `tests/thresholds.test.mjs` + `tests/cli.test.mjs` 对照组 |
 | K17 | `ESM-CJS-MISMATCH` 第 4 条必须看**符号所在层**；`commander` 不得判 MISMATCH | `src/check.mjs` | `tests/cli.test.mjs` 对照组 + `fixtures/esm-cjs-mismatch` |
 | K18 | 五包指纹件**禁手改**；改它只能改生成器 + 重跑 `--check` | `tools/gen-fingerprints.mjs` | `tools/gen-fingerprints.mjs --check` + `tests/fingerprints.test.mjs` |
+| K19 | 脱敏门 `SKIP_DIRS` 必须覆盖 `.gitignore` 的每个本地目录 | `tools/check-desensitized.mjs` | `tests/gate-selfcheck.test.mjs`（逐条对账）+ 变异组 D5 |
+| K20 | 破坏性验证在临时副本里做，不用 `git checkout` 恢复工作树 | 约定（见 §二.15） | —（操作纪律，机器判不了） |
 
 ## 五、本机环境坑（只写实测过的，2026-11-01）
 
@@ -157,8 +204,8 @@ M0 的 K1–K11 全部继续有效（见 `plan/HANDOFF-M0.md` §四），M1 新�
 | 3 | 六份 `fixtures/*/INPUT.md` + `expected.json` 定稿 | ✅ | C1–C7 齐；每份声明验证哪条 + 为什么能证伪；`tests/fixtures.test.mjs` 9 条 |
 | 4 | 生成器产出确定：`--check` 逐字节一致（双跑比对） | ✅ | `gen-fingerprints --check: 5/5 份逐字节一致` |
 | 5 | 口径回填：§5.3 三行改具体数值（欠债清零） | ✅ | 4096 键 / 512 KiB / 双条件；`LIMITS` 镜像；`tests/thresholds.test.mjs` 双向 |
-| 6 | `npm test` 本地全绿 | ✅ | **95 passed / 0 failed / 0 skipped** |
-| 7 | 三道门全绿 | ✅ | layout 10 条 PASS / desensitized 0 命中 / mutations 17 组符合预期 |
+| 6 | `npm test` 本地全绿 | ✅ | **99 passed / 0 failed / 0 skipped** |
+| 7 | 三道门全绿 | ✅ | layout 10 条 PASS / desensitized 0 命中 / mutations 18 组符合预期 |
 | 8 | 状态副本三处一致 | ✅ | `plan/00` §4 + `plan/05` §1 + `plan/00` §3 台账；`LAYOUT.STATUS` + `LAYOUT.LEDGER` PASS |
 | 9 | CI 实跑 | ⬜ **不适用** | 无远端，**未跑 CI**；本地等价校验见 §一 |
 
@@ -171,10 +218,10 @@ M0 的 K1–K11 全部继续有效（见 `plan/HANDOFF-M0.md` §四），M1 新�
 # 门（每个对话开头 + 每次收尾）
 node tools/check-sprint-layout.mjs      # 布局门，期望 rc=0 全绿
 node tools/check-desensitized.mjs       # 脱敏门，期望 0 命中
-node tools/mutate-gates.mjs             # 变异验证，期望 17/17 符合预期
+node tools/mutate-gates.mjs             # 变异验证，期望 18/18 符合预期
 
 # 测试
-npm test                                # 期望 95/95（M2 起会增加）
+npm test                                # 期望 99/99（M2 起会增加）
 
 # 指纹（M1 新增）
 node tools/gen-fingerprints.mjs --list              # 列五包 + 指纹，不读写文件

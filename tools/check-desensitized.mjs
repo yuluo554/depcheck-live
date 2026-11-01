@@ -21,6 +21,10 @@
 //      并把豁免份数打进结论行；`.git` 在 worktree 里是文件不是目录，两态都要挡；
 //   ④ **扫描面 = 仓库内容，不是本地环境**：`.gitignore` 声明的每个本地目录这里都要有对应项
 //      （名字随包名变的用后缀规则）。判据要问"跑我这一步时磁盘上多了什么？"
+//      ⚠️ M1 实测补记：`.mimosa/`（工具 hook 的会话状态）曾被漏掉，扫描面从 70 涨到 137 个文件
+//      —— 它当时恰好没有命中项，但那只是运气；会话状态里随时可能出现本机绝对路径。
+//      **新增 `.gitignore` 本地目录时必须同笔加进 SKIP_DIRS**，`tests/gate-selfcheck.test.mjs`
+//      会读 `.gitignore` 逐条对账（漏一项即红），不靠人记。变异组 D5 钉住这条的实际效果。
 
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
@@ -46,6 +50,14 @@ const SELF = new Set([
 const SKIP_DIRS = new Set([
   ".git", ".tmp", "tmp", "dist", "dist-release", "node_modules", ".cache", ".venv", "venv",
   "build", "_private", ".depcheck-live", ".pytest_cache", "coverage", "_scratch", ".venv-readme",
+  // 编辑器 / 系统 / 工具本地的状态目录（`.gitignore` 里声明过的，这里必须有对应项）
+  ".vscode", ".idea", ".mimosa",
+  // `.gitignore` 的 Python 模板残留段：本仓不产出这些路径，但**留着对应项**——
+  // 万一有人在本仓跑 pytest/venv，这些目录会出现在磁盘上，届时必须已经在外。
+  // `share/python-wheels/` 按 basename 取 `python-wheels`（门的匹配口径是目录名）。
+  "__pycache__", ".eggs", "develop-eggs", "downloads", "eggs", "lib", "lib64", "parts",
+  "sdist", "var", "wheels", "ENV", "env", "python-wheels",
+  ".tox", ".nox", ".hypothesis", ".mypy_cache", ".ruff_cache", "htmlcov",
 ]);
 const SKIP_SUFFIXES = [".egg-info", ".dist-info"];
 const SKIP_EXTS = new Set([".png", ".jpg", ".jpeg", ".gif", ".ico", ".zip", ".gz", ".exe", ".dll", ".pdf", ".woff", ".woff2"]);

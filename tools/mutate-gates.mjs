@@ -16,7 +16,7 @@
 //
 // 变异靶子一律锚**既有事实**（不锚"某个里程碑还没完成"），所以永不随进度过期。
 
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -246,6 +246,21 @@ const GROUPS = [
     gate: DESENS,
     name: "文档里写本机用户名",
     apply: (cwd) => mutateFile(cwd, "README.md", "# depcheck-live", "# depcheck-live\n\n作者机器 ASUS-PC"),
+  },
+  {
+    id: "D5",
+    gate: DESENS,
+    name: "本地状态目录（.mimosa）里出现绝对路径 → 必须**不**被扫到（跳过硬编码）",
+    // 这条钉住 `SKIP_DIRS` 与 `.gitignore` 的对齐：M1 实测时 `.mimosa/` 漏在跳过名单外，
+    // 扫描面从 70 涨到 137。靶子落在"被跳过的目录"里放一个真命中项：
+    // 若门把该目录放回扫描面，这条就会红（期望绿）。
+    expect: "green",
+    apply: (cwd) => {
+      const dir = join(cwd, ".mimosa", "hook-state");
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "leak.txt"), "临时产物在 D:/ProgramData/scratch/out 下\n");
+      return { ok: true };
+    },
   },
   // ── 阴性对照（期望**绿**）：证明判据没写死、没断言了全世界 ─────────────
   {
