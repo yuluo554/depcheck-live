@@ -68,9 +68,11 @@ function handoffBody(k, why) {
   );
 }
 const DESENS = ["node", "tools/check-desensitized.mjs"];
+const RELEASE = ["node", "tools/check-release.mjs"];
 const PLAN00 = "plan/00-README总览.md";
 const PLAN05 = "plan/05-里程碑与发布.md";
 const PLAN06 = "plan/06-交付对标与决策.md";
+const RELEASE_DOC = "plan/RELEASE-M6.md";
 
 /**
  * 变异组。`expect` = "red" 或 "green"（阴性对照）。
@@ -263,9 +265,30 @@ const GROUPS = [
     id: "L8",
     gate: LAYOUT,
     judge: "LAYOUT.DOC_TOOLS",
-    name: "往 PENDING_TOOLS 所属里程碑填一个已 ✅ 的号（登记项必须自清理）",
-    apply: (cwd) =>
-      mutateFile(cwd, "tools/check-sprint-layout.mjs", '"tools/check-release.mjs": 6', '"tools/check-release.mjs": 0'),
+    name: "登记一条『文档点名、里程碑已 ✅、但没落位』的脚本（登记项必须自清理）",
+    // ⚠️ M6 实测改写：原靶子是 `"tools/check-release.mjs": 6` → `: 0`，而 M6 收尾已经把
+    // 那条登记**清掉了**（发布门真落位，不清就是真缺陷）。靶子若继续指那条，会因
+    // "marker 找不到" 报 SKIP —— 那正是本文件头部纪律②说的"靶子消失不许静默变绿"。
+    //
+    // 正解：靶子**自己造一件完整的事**——往 PENDING_TOOLS 注入一条野登记，同时在
+    // `plan/06` 注入一处对它的引用（门只对"被文档点名且在待落位登记里"的路径报 stale）。
+    // 这样靶子锚的是门的**判据形态**（登记 → 已 ✅ → 必须红），与仓库当前登记了几条无关，
+    // 永不随进度过期。
+    apply: (cwd) => {
+      const reg = mutateFile(
+        cwd,
+        "tools/check-sprint-layout.mjs",
+        "const PENDING_TOOLS = {};",
+        'const PENDING_TOOLS = { "tools/zz-never-shipped.mjs": 0 };',
+      );
+      if (reg.ok === false) return reg;
+      return mutateFile(
+        cwd,
+        "plan/06-交付对标与决策.md",
+        "## 1. 评分对标",
+        "变异靶子：点名 `tools/zz-never-shipped.mjs`。\n\n## 1. 评分对标",
+      );
+    },
   },
   {
     id: "L9",
@@ -354,6 +377,59 @@ const GROUPS = [
     expect: "green",
     name: "阴性对照：公开镜像源（清华源）不是私有代理，必须放行",
     apply: (cwd) => mutateFile(cwd, "README.md", "# depcheck-live", "# depcheck-live\n\n镜像 pypi.tuna.tsinghua.edu.cn / goproxy.cn"),
+  },
+  // ── 发布门（M6）：每条判据一组 ─────────────────────────────────────────
+  {
+    id: "R1",
+    gate: RELEASE,
+    judge: "RELEASE.FACTS",
+    name: "事实块的 END 标记删掉（判据面消失 → 必须红，不许静默按空块读）",
+    apply: (cwd) => mutateFile(cwd, RELEASE_DOC, "\n<!-- RELEASE-FACTS:END -->", ""),
+  },
+  {
+    id: "R2",
+    gate: RELEASE,
+    judge: "RELEASE.VERSION",
+    name: "把留档事实块的 version 改成另一个号（版本三处不一致）",
+    // 靶子改的是**事实块里的那一行**（判据读的正是它），不是正文别的 0.1.0 文本，
+    // 也不是 package.json（那条由 R4 管）。表格行按整行匹配，贴合门"按整行锚定"的读法。
+    apply: (cwd) => mutateFile(cwd, RELEASE_DOC, "| version | 0.1.0 |", "| version | 0.2.0 |"),
+  },
+  {
+    id: "R3",
+    gate: RELEASE,
+    judge: "RELEASE.ASSET",
+    name: "附件名改成不含版本号的形态（发布后从名字认不出是哪个版本）",
+    apply: (cwd) => mutateFile(cwd, RELEASE_DOC, "| attachment | depcheck-live-0.1.0.zip |", "| attachment | depcheck-live.zip |"),
+  },
+  {
+    id: "R4",
+    gate: RELEASE,
+    judge: "RELEASE.VERSION",
+    name: "只改 package.json 的 version（留档没跟 → 三处不一致必须红）",
+    apply: (cwd) => mutateFile(cwd, "package.json", '"version": "0.1.0"', '"version": "0.1.1"'),
+  },
+  {
+    id: "R5",
+    gate: RELEASE,
+    judge: "RELEASE.FACTS",
+    name: "事实块里塞一个重复字段（值互相覆盖却只报最后一个 → 假绿）",
+    apply: (cwd) => mutateFile(cwd, RELEASE_DOC, "| attachment | depcheck-live-0.1.0.zip |", "| attachment | depcheck-live-0.1.0.zip |\n| attachment | depcheck-live-0.9.9.zip |"),
+  },
+  {
+    id: "R6",
+    gate: RELEASE,
+    expect: "green",
+    name: "阴性对照：在说明段落里引用标记字面量，必须放行（K37：按整行锚定，不误判）",
+    // 与 R1 恰好互补：R1 证明"真标记被删会红"，本组证明"说明段落里的同名子串不会误伤"。
+    // 两条一起钉住"按整行锚定"这个实现决定——退回 indexOf 时 R6 会红（切到说明段落里的假标记）。
+    apply: (cwd) =>
+      mutateFile(
+        cwd,
+        RELEASE_DOC,
+        "## 一、tag 前事实",
+        "> 说明：正文里再提一次 `<!-- RELEASE-FACTS:BEGIN -->` 与 `<!-- RELEASE-FACTS:END -->` 不会影响机器读取。\n\n## 一、tag 前事实",
+      ),
   },
 ];
 

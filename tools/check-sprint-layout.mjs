@@ -105,10 +105,12 @@ const RELEASE_MILESTONE = 6;
 /**
  * 文档点名但**还没到**该里程碑的脚本。里程碑翻 ✅ 后必须删除本条，否则 stale 分支变红。
  * 第三个状态：不是 EXEMPT（不打算做）、也不是缺件（真缺陷）。
+ *
+ * M6 收尾时 `tools/check-release.mjs` 已落位，**本条清空**。空登记不等于判据失效：
+ * 「登记了就必须自清理」这条由变异组 L8 用**注入一条野登记**来钉住（见 `tools/mutate-gates.mjs`），
+ * 不需要仓库里长期留一条假待办当靶子。
  */
-const PENDING_TOOLS = {
-  "tools/check-release.mjs": 6,
-};
+const PENDING_TOOLS = {};
 /** 确实不打算实现时逐条登记 + 写理由（本项目当前为空）。 */
 const EXEMPT_TOOLS = new Set([]);
 

@@ -16,11 +16,12 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test tests/architecture.test.mjs tests/gate-selfcheck.test.mjs tests/handoff-pointer.test.mjs tests/paths.test.mjs tests/resolve.test.mjs tests/scan.test.mjs tests/scan-edge.test.mjs tests/scan-large-file.test.mjs tests/fingerprints.test.mjs tests/thresholds.test.mjs tests/fixtures.test.mjs tests/fixtures-layout.test.mjs tests/fixtures-run.test.mjs tests/cli.test.mjs tests/drift.test.mjs tests/baselines.test.mjs tests/contract.test.mjs tests/bench.test.mjs tests/selftest.test.mjs",
+    "test": "node --test tests/architecture.test.mjs tests/gate-selfcheck.test.mjs tests/handoff-pointer.test.mjs tests/paths.test.mjs tests/resolve.test.mjs tests/scan.test.mjs tests/scan-edge.test.mjs tests/scan-large-file.test.mjs tests/fingerprints.test.mjs tests/thresholds.test.mjs tests/fixtures.test.mjs tests/fixtures-layout.test.mjs tests/fixtures-run.test.mjs tests/cli.test.mjs tests/drift.test.mjs tests/baselines.test.mjs tests/contract.test.mjs tests/bench.test.mjs tests/selftest.test.mjs tests/release.test.mjs",
     "gate:layout": "node tools/check-sprint-layout.mjs",
     "gate:desensitized": "node tools/check-desensitized.mjs",
     "gate:mutations": "node tools/mutate-gates.mjs",
-    "gate:contract": "node tools/verify-contract-mutations.mjs"
+    "gate:contract": "node tools/verify-contract-mutations.mjs",
+    "gate:release": "node tools/check-release.mjs"
   },
   "keywords": [
     "dependency",

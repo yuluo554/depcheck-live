@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   layout:
-    name: 门（布局 / 脱敏 / 变异）
+    name: 门（布局 / 脱敏 / 发布 / 变异）
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,6 +23,11 @@ jobs:
         run: node tools/check-sprint-layout.mjs
       - name: 脱敏门
         run: node tools/check-desensitized.mjs
+      # 发布门只挂**离线档**：它只读仓库内文件，任意触发形态都成立。
+      # `--pre-tag` 的判据之一是"这个 tag 还不存在"——tag 推送那一轮它必红；
+      # `--online` 需要网络 + gh 登录 + 已首推。两档都只能人手跑（见 plan/RELEASE-M6.md §四）。
+      - name: 发布门（离线档）
+        run: node tools/check-release.mjs
       - name: 变异验证（两道门都要能跑红）
         run: node tools/mutate-gates.mjs
 
@@ -74,6 +79,7 @@ jobs:
           tests/contract.test.mjs
           tests/bench.test.mjs
           tests/selftest.test.mjs
+          tests/release.test.mjs
       - name: CLI 冒烟（退出码 0 / 4 / 3）
         shell: bash
         run: |

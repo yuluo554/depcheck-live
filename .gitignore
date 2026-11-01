@@ -65,6 +65,9 @@ _private/
 .depcheck-live/
 tmp/
 *.tmp
+# 发布附件（M6 口径 A：整个 tag 树的 zip）。产物不入库——它由 tag 树生成，
+# 入库会让"附件"与"tag 树"成为两份可能漂移的副本。sha256 记在 plan/RELEASE-M6.md。
+dist-release/
 
 # ---------- 编辑器 / 系统 ----------
 .vscode/

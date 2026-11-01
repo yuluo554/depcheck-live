@@ -64,9 +64,11 @@ node tools/check-sprint-layout.mjs    # 布局门；必须绿，红了先修布�
 | `npm test` | 单元/契约测试（`node --test`，零第三方依赖） | 每次改动 |
 | `node tools/check-sprint-layout.mjs` | 布局门（方法论装订，进 CI） | **每个对话开头 + 每次收尾** |
 | `node tools/check-desensitized.mjs` | 脱敏门（绝对路径 / 用户名 / 回环代理） | 每次提交前；发布前必须 0 命中 |
-| `node tools/mutate-gates.mjs` | 两道门的**变异验证宿主**（20 组；在临时副本里改坏一瓶，断言门会红） | 改动任何门之后 |
+| `node tools/check-release.mjs` | 发布门（版本 ↔ tag ↔ 发布留档三处一致；**离线档进 CI**） | 发布期；改版本号或 `plan/RELEASE-M6.md` 时 |
+| `node tools/mutate-gates.mjs` | 三道门的**变异验证宿主**（26 组；在临时副本里改坏一瓶，断言门会红） | 改动任何门之后 |
 
-`tools/check-release.mjs`（发布门）由 M6 落位，现登记在布局门的 `PENDING_TOOLS`。
+发布门三档（`--pre-tag` / 默认离线档 / `--online`）的适用面与"为什么 CI 只能挂离线档"，
+见 `plan/RELEASE-M6.md` §四。
 
 ## 四、环境事实与禁忌（只写实测过的）
 
