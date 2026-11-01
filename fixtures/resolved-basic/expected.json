@@ -11,6 +11,8 @@
   },
   "expect": {
     "exitCode": 0,
+    "invocation": "check-only",
+    "invocationRationale": "本 case 验 check 层的五判定态。**不得**用 `--with-drift` 跑：drift 层会为 chalk/commander/date-fns/glob 产出 NO-BASELINE，把 gaps 抬到 4、退出码抬到 3——那是 drift 层'算不了'，不是 check 层的结论（data/README.md §5.1 的 NO-BASELINE 单条口径）",
     "summary": {
       "problems": 0,
       "gaps": 0,

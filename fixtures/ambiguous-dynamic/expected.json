@@ -5,19 +5,28 @@
   "milestone": "M2",
   "verifies": "AMBIGUOUS",
   "source": {
-    "packages": ["chalk@6.0.1", "zod@4.6.7"],
+    "packages": [
+      "chalk@6.0.1",
+      "zod@4.6.7"
+    ],
     "provenance": "本项目合成（plan/04 §6：每种动态形态各一例）",
     "note": "本项目不执行被测代码（plan/00 §2.1），静态解析不到的一律 AMBIGUOUS"
   },
   "designNote": "M2 实测修正了两处语料设计：(1) 点 4 原写法 `plugins: [pkgName]` 里没有任何加载调用，按本工具'引用点 = 加载调用点'的模型不存在可判对象——现改为经 require() 加载 config 里的运行时值；(2) 配置对象里的**字面量**包名是 plan/03 §3 的合法 string-literal 引用点，会额外产出 RESOLVED，故该点只放变量。",
   "expect": {
     "exitCode": 0,
+    "invocation": "check-only",
+    "invocationRationale": "本 case 验 check 层的 AMBIGUOUS。**不得**用 `--with-drift` 跑：AMBIGUOUS 点的 specifier 为 null，drift 层无从判定（src/drift.mjs 的 specifier === null 早退），混跑不产出任何 drift 结论",
     "exitCodeRationale": "data/README.md §5.1 硬纪律：仅存在 AMBIGUOUS、无确证问题时退出码为 0，但报告须显式计数",
     "summary": {
       "problems": 0,
       "gaps": 0,
       "ambiguous": 5,
-      "minTotalPoints": 6
+      "minTotalPoints": 6,
+      "byStatus": {
+        "AMBIGUOUS": 5,
+        "RESOLVED": 1
+      }
     }
   },
   "points": [
@@ -97,7 +106,9 @@
       "line": 3,
       "kind": "import",
       "specifier": "zod",
-      "imported": ["z"],
+      "imported": [
+        "z"
+      ],
       "status": "RESOLVED",
       "whyCounterexample": "静态字面量必须判 RESOLVED；防『全判 AMBIGUOUS』的实现",
       "evidence": {

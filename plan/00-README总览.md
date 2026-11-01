@@ -56,8 +56,8 @@
 | `NOT-EXPORTED-SUBPATH` 判定 | `exports` 子路径屏蔽 | ✅ | `bench`（C4，chalk/commander 的 `./package.json`） | ✅ M3 |
 | `AMBIGUOUS` 判定 | 动态形态识别 | ✅ | `bench` 动态样例（C5） | ✅ M3 |
 | `VERSION-BEHAVIOR-DRIFT` 判定 | 离线指纹包 | ✅ | `bench` + C6 逐点对账（离线基线 `data/fingerprints/`） | ✅ M3 |
-| 退出码语义可分 | `data/README.md` §5 | ✅ | `tests/cli.test.mjs` 断言 | ⬜ 待 M4 |
-| 干净工程零误报 | 合成干净语料 | ✅ | `bench --clean` | ⬜ 待 M4 |
+| 退出码语义可分 | `data/README.md` §5 | ✅ | `selftest`（8 条断言覆盖 0/1/3/4）+ `tests/selftest.test.mjs` + `tests/cli.test.mjs` | ✅ M4 |
+| 干净工程零误报 | 合成干净语料 | ✅ | `bench --clean`（C7：problems=0 且 totalPoints=7） | ✅ M4 |
 | Skill 契约块双向一致 | `SKILL.md` ↔ `src/contract.mjs` | ✅ | `tests/contract.test.mjs` | ⬜ 待 M5 |
 | 裸 clone 可复现 | README 步骤 | ✅ | 手工 + CI（待首推） | ⬜ 待 M6 |
 | 布局门可跑红（10 条判据） | `tools/check-sprint-layout.mjs` | ✅ | `tools/mutate-gates.mjs` | ✅ M0 |
@@ -76,7 +76,7 @@
 | M1 | 数据先行：`exports` 六形态语义核对入 `data/README` §5、五包对照组指纹与六份语料定稿 | ✅ 已完成 |
 | M2 | 解析层：`exports` 解析器 + 引用点抽取器 + `fixtures/` 落地（含 `snapshot` / `scan` 命令） | ✅ 已完成 |
 | M3 | 判定层：五个判定态 + `drift`（离线基线）+ `bench` | ✅ 已完成 |
-| M4 | 基准：`bench` / `selftest` / 退出码断言 / 干净零误报集 | ⬜ 待 M4 |
+| M4 | 基准：`bench` / `selftest` / 退出码断言 / 干净零误报集 | ✅ 已完成 |
 | M5 | 交付：CLI 完整面 + `SKILL.md`（契约块双向断言）+ 技术报告 + demo GIF | ⬜ 待 M5 |
 | M6 | 发布：脱敏 + 干净环境验证 + 建仓 + CI 首跑 + tag + Release | ⬜ 待 M6 |
 
@@ -99,7 +99,7 @@
 | `NOT-EXPORTED-SUBPATH` | 同上 | `bench` 子路径集 |
 | `AMBIGUOUS` | 同上 | `bench` 动态集 |
 | `VERSION-BEHAVIOR-DRIFT` | `drift` 命令 | `bench` 离线指纹集 |
-| 退出码语义 | `check` 的进程退出码 | `tests/cli.test.mjs` 断言 |
+| 退出码语义 | `check` 的进程退出码 | `selftest` 断言（覆盖 0/1/3/4）+ `tests/cli.test.mjs` |
 
 ## 7. 提交材料实物表
 
@@ -109,8 +109,8 @@
 | 架构选型 | `plan/02-架构与技术选型.md` | M0 | `git ls-files` |
 | 模块详设 | `plan/03-模块详设.md` | M0 | `git ls-files` |
 | 数据计划 | `plan/04-数据计划.md` | M0 | `git ls-files` |
-| 基准语料 | `fixtures/*/INPUT.md` + `expected.json` + `src/` | ✅ M3（C1–C6；C7 属 M4） | `git ls-files fixtures/` |
-| 自测与基准 | `tests/` + `selftest`/`bench` 命令 | `bench` ✅ M3 / `selftest` M4 | `npm test && node bin/depcheck-live.mjs bench` |
+| 基准语料 | `fixtures/*/INPUT.md` + `expected.json` + `src/` | ✅ M4（C1–C7 全落地；C7 由 `bench --clean` 验） | `git ls-files fixtures/` |
+| 自测与基准 | `tests/` + `selftest`/`bench` 命令 | ✅ M4（`bench` M3、`bench --clean` 与 `selftest` M4） | `npm test && node bin/depcheck-live.mjs bench` |
 | Agent Skill | `SKILL.md` | M5 | `git ls-files SKILL.md` |
 | 技术报告 | `docs/技术报告.md` | M5 | `git ls-files docs/` |
 | 演示产物 | `docs/demo/demo.gif` | M5 | `git ls-files docs/demo/` |

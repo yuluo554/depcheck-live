@@ -16,12 +16,14 @@ const USAGE = `用法: ${TOOL} <命令> [选项] [路径]
   snapshot <path>   只输出依赖面快照
   scan <path>       只输出引用点
   drift <path>      版本行为漂移（需离线基线）
-  selftest          自检（M4 落位）
-  bench             基准（M3 落位）
+  selftest          自检：现场造最小工程断言退出码 0/1/3/4
+  bench             基准：逐条 + 逐项对账 C1–C6
+  bench --clean     干净工程零误报基准（C7）
 
 选项:
   --json            机读输出
   --with-drift      在 check 中一并做 drift 判定
+  --clean           仅对 bench 有效：只跑干净工程零误报集
   --baseline-dir <路径>
                     drift 的离线基线目录（默认: <工程根>/data/fingerprints）
   --version         打印版本
@@ -32,12 +34,22 @@ const USAGE = `用法: ${TOOL} <命令> [选项] [路径]
 
 /** 解析 argv（不含 node 与脚本路径）。返回 `{ok, opts, error}`，永不抛。 */
 export function parseArgv(argv) {
-  const opts = { json: false, withDrift: false, version: false, help: false, command: null, path: null, baselineDir: null };
+  const opts = {
+    json: false,
+    withDrift: false,
+    clean: false,
+    version: false,
+    help: false,
+    command: null,
+    path: null,
+    baselineDir: null,
+  };
   const rest = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--json") opts.json = true;
     else if (arg === "--with-drift") opts.withDrift = true;
+    else if (arg === "--clean") opts.clean = true;
     else if (arg === "--baseline-dir") {
       const next = argv[i + 1];
       if (!next || next.startsWith("-")) return { ok: false, opts, error: "--baseline-dir 需要参数" };
@@ -57,8 +69,11 @@ export function parseArgv(argv) {
 
   if (command === "selftest" || command === "bench") {
     if (tail.length > 0) return { ok: false, opts, error: `${command} 不接受路径参数` };
+    if (opts.clean && command !== "bench") return { ok: false, opts, error: "--clean 只对 bench 有效" };
     return { ok: true, opts, error: null };
   }
+  // 其余命令不吃 --clean：显式报用法错误，不静默忽略（静默忽略会让用户以为"只跑了干净集"）
+  if (opts.clean) return { ok: false, opts, error: "--clean 只对 bench 有效" };
   if (tail.length !== 1) return { ok: false, opts, error: `${command} 需要且只接受一个路径参数` };
   opts.path = tail[0];
   return { ok: true, opts, error: null };

@@ -5,12 +5,19 @@
   "milestone": "M2",
   "verifies": "NOT-EXPORTED-SUBPATH",
   "source": {
-    "packages": ["chalk@6.0.1", "commander@15.0.0", "zod@4.6.7", "glob@14.0.3"],
+    "packages": [
+      "chalk@6.0.1",
+      "commander@15.0.0",
+      "zod@4.6.7",
+      "glob@14.0.3"
+    ],
     "provenance": "data/packages/*.json 的 exposesPackageJson 字段",
     "note": "null 屏蔽形态五包构造不出，由 tests/resolve.test.mjs 形态③（实测 exact-null-blocked）钉住"
   },
   "expect": {
     "exitCode": 1,
+    "invocation": "check-only",
+    "invocationRationale": "本 case 验 check 层的 NOT-EXPORTED-SUBPATH。**不得**用 `--with-drift` 跑：drift 层对『只加载包、不取符号』的引用点无判据（src/drift.mjs 的 wanted.length === 0 早退），给不出结论；混跑只会稀释本 case 的判据",
     "summary": {
       "problems": 3,
       "gaps": 0,
@@ -32,7 +39,9 @@
       "evidence": {
         "rule": "data/README.md §5 形态③（未列该子路径）",
         "exportsSnippet": "\"exports\": { \"types\": \"./source/index.d.ts\", \"default\": \"./source/index.js\" }",
-        "exportsKeys": ["."],
+        "exportsKeys": [
+          "."
+        ],
         "exposesPackageJson": false,
         "why": "chalk 的 exports 只有两个**条件键**（sugar 形态，等价于 {\".\": …}），keys 里没有 \"./package.json\" → 屏蔽"
       }
@@ -48,7 +57,9 @@
       "evidence": {
         "rule": "data/README.md §5 形态③（未列该子路径）",
         "exportsSnippet": "\".\": { \"types\": \"./typings/index.d.ts\", \"default\": \"./index.js\" }",
-        "exportsKeys": ["."],
+        "exportsKeys": [
+          "."
+        ],
         "exposesPackageJson": false,
         "why": "commander 只导出 \".\"，未列 \"./package.json\""
       }
@@ -63,7 +74,9 @@
       "status": "NOT-EXPORTED-SUBPATH",
       "evidence": {
         "rule": "data/README.md §5 形态③（exports 只暴露 '.'，其余子路径一律封装）",
-        "exportsKeys": ["."],
+        "exportsKeys": [
+          "."
+        ],
         "why": "Node 原文：一旦声明 exports，包内全部子路径被封装（all subpaths of the package are encapsulated）。本条与 c4-1 同判据但子路径不同——证明屏蔽不是只针对 package.json 的特例"
       }
     },

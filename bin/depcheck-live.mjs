@@ -2,8 +2,9 @@
 // ═══ CLI 入口 ═══
 // 只做三件事：解析 argv → 调编排层 → 打印 + 设退出码。判定逻辑一概不在这里。
 //
-// `selftest` / `bench` 在 M0 是**显式未实现**（exit 3，不是假装通过）：
+// `selftest` / `bench` 在 M0–M3 是**显式未实现**（exit 3，不是假装通过）：
 // "这一层没跑"必须与"跑了没问题"可区分（`plan/05` §4 U 项纪律）。
+// M3 落位 `bench`，M4 落位 `selftest`——两条命令现在都真的跑。
 
 import { resolve } from "node:path";
 import { TOOL, EXIT } from "../src/contract.mjs";
@@ -12,6 +13,7 @@ import { checkAll, decideExit, decideSnapshotExit, decideScanExit, decideDriftEx
 import { snapshotAll, scanAll } from "../src/commands.mjs";
 import { renderHuman, renderJson, renderSnapshot, renderScan, renderDrift } from "../src/report.mjs";
 import { benchAll, renderBench } from "../src/bench.mjs";
+import { selftestAll, renderSelftest } from "../src/selftest.mjs";
 import { readVersion } from "../src/version.mjs";
 
 function main(argv) {
@@ -31,12 +33,18 @@ function main(argv) {
     return EXIT.OK;
   }
 
+  // `selftest`（M4）：在本机现场造最小工程，断言退出码 0/1/3/4 四条语义。
+  // 它的退出码是**自检自身**的结论：全部断言通过 → 0，有断言失败 → 1。
+  // 不用 3：`selftest` 跑不动（比如临时目录建不了）是异常，不是"算不了"这种业务态——
+  // 真出异常时 node 自己会以非零退出，不会被读成"通过"。
   if (opts.command === "selftest") {
-    process.stderr.write(`${TOOL}: selftest 尚未实现（M4 落位）\n`);
-    return EXIT.CANNOT_COMPUTE;
+    const selftest = selftestAll();
+    process.stdout.write(opts.json ? renderJson(selftest) : renderSelftest(selftest));
+    return selftest.ok ? EXIT.OK : EXIT.PROBLEMS;
   }
+  // `bench`（M3）与 `bench --clean`（M4）：`--clean` 只跑干净工程零误报集（C7）。
   if (opts.command === "bench") {
-    const bench = benchAll(process.cwd());
+    const bench = benchAll(process.cwd(), { clean: opts.clean });
     process.stdout.write(opts.json ? renderJson(bench) : renderBench(bench));
     if (!bench.ok) return exitCodeFor(bench.reason ? "CANNOT_COMPUTE" : "PROBLEMS");
     return exitCodeFor("OK");

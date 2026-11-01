@@ -11,10 +11,15 @@
   },
   "expect": {
     "exitCode": 0,
+    "invocation": "check-only",
+    "invocationRationale": "本 case 只验 check 层的零误报。**不得**用 `--with-drift` 跑：drift 层会为 chalk/commander/date-fns/glob 产出 NO-BASELINE（无离线基线），把退出码抬到 3——那是 drift 层'算不了'，不是 check 层'有误报'，两层混跑会把零误报的真值读成假。判据见 data/README.md §5.1（NO-BASELINE 单条口径）",
     "summary": {
       "problems": 0,
       "gaps": 0,
-      "minTotalPoints": 8
+      "minTotalPoints": 8,
+      "byStatus": {
+        "RESOLVED": 7
+      }
     },
     "findingRule": "findings 里每条都必须是 RESOLVED；问题数看 summary.problems，不是 findings.length"
   },
@@ -28,7 +33,12 @@
       "imported": ["z"],
       "status": "RESOLVED",
       "falsePositiveRisk": "type:module + 有 require 分支 → 只看 type 会误判 MISMATCH",
-      "evidence": { "hasRequireBranch": true, "toFillIn": "M2" }
+      "evidence": {
+        "rule": "data/README.md §5.2 反面判据（type:module 但有 require 分支 → 不得判 MISMATCH）",
+        "sourceLine": "src/a.cjs:2 `const { z } = require(\"zod\");`",
+        "packageFact": "data/packages/zod.json 的 hasRequireBranch=true、type=module",
+        "installedEvidence": "node_modules/zod 的 require 视角导出面 261 个名字，含 z"
+      }
     },
     {
       "id": "c7-2-date-fns-require",
@@ -39,7 +49,12 @@
       "imported": ["addDays"],
       "status": "RESOLVED",
       "falsePositiveRisk": "同上",
-      "evidence": { "hasRequireBranch": true, "toFillIn": "M2" }
+      "evidence": {
+        "rule": "data/README.md §5.2 反面判据",
+        "sourceLine": "src/b.cjs:2 `const { addDays } = require(\"date-fns\");`",
+        "packageFact": "data/packages/date-fns.json 的 hasRequireBranch=true、type=module",
+        "installedEvidence": "node_modules/date-fns 的 require 视角导出面 250 个名字，含 addDays"
+      }
     },
     {
       "id": "c7-3-glob-require",
@@ -50,7 +65,12 @@
       "imported": ["globSync"],
       "status": "RESOLVED",
       "falsePositiveRisk": "同上",
-      "evidence": { "hasRequireBranch": true, "toFillIn": "M2" }
+      "evidence": {
+        "rule": "data/README.md §5.2 反面判据",
+        "sourceLine": "src/c.cjs:2 `const { globSync } = require(\"glob\");`",
+        "packageFact": "data/packages/glob.json 的 hasRequireBranch=true、type=module",
+        "installedEvidence": "node_modules/glob 的 require 视角导出面 17 个名字，含 globSync"
+      }
     },
     {
       "id": "c7-4-commander-require",
@@ -61,7 +81,12 @@
       "imported": ["Command"],
       "status": "RESOLVED",
       "falsePositiveRisk": "无 require 分支，但符号在命名空间上 → 只看 hasRequireBranch 会误判 MISMATCH",
-      "evidence": { "hasRequireBranch": false, "toFillIn": "M2" }
+      "evidence": {
+        "rule": "data/README.md §5.2 第 4 条（判据落在'被取用的符号能否从命名空间直达'）",
+        "sourceLine": "src/d.cjs:2 `const { Command } = require(\"commander\");`",
+        "packageFact": "data/packages/commander.json 的 hasRequireBranch=false",
+        "installedEvidence": "node_modules/commander 的 require 视角导出面 11 个名字，含 Command（命名空间上可直达，不在 .default 下）"
+      }
     },
     {
       "id": "c7-5-chalk-import",
@@ -72,7 +97,11 @@
       "imported": ["default"],
       "status": "RESOLVED",
       "falsePositiveRisk": "合法 ESM 用法",
-      "evidence": { "toFillIn": "M2" }
+      "evidence": {
+        "rule": "data/README.md §5.2（第 3 条要求引用点为 CJS 加载，import 不落入 MISMATCH）",
+        "sourceLine": "src/e.mjs:2 `import chalk from \"chalk\";`",
+        "installedEvidence": "node_modules/chalk 的 import 视角导出面 14 个名字，含 default"
+      }
     },
     {
       "id": "c7-6-zod-pkgjson",
@@ -83,7 +112,11 @@
       "imported": [],
       "status": "RESOLVED",
       "falsePositiveRisk": "显式列出的子路径 → 过度应用屏蔽会误判 NOT-EXPORTED-SUBPATH",
-      "evidence": { "exposesPackageJson": true, "toFillIn": "M2" }
+      "evidence": {
+        "rule": "data/README.md §5.4（屏蔽的是**未列**的子路径，不是所有子路径）",
+        "sourceLine": "src/f.cjs:2 `const pkg = require(\"zod/package.json\");`",
+        "packageFact": "data/packages/zod.json 的 exports 键含 './package.json'、exposesPackageJson=true"
+      }
     },
     {
       "id": "c7-7-glob-raw",
@@ -94,18 +127,27 @@
       "imported": [],
       "status": "RESOLVED",
       "falsePositiveRisk": "同上",
-      "evidence": { "toFillIn": "M2" }
-    },
+      "evidence": {
+        "rule": "data/README.md §5.4（同上：只屏蔽未列子路径）",
+        "sourceLine": "src/g.cjs:2 `const raw = require(\"glob/raw\");`",
+        "packageFact": "data/packages/glob.json 的 exports 键含 './raw'"
+      }
+    }
+  ],
+  "negativePoints": [
     {
       "id": "c7-8-relative",
       "file": "src/h.mjs",
       "line": 1,
       "kind": "import",
       "specifier": "./local.mjs",
-      "imported": ["default"],
-      "status": "OUT-OF-SCOPE",
-      "falsePositiveRisk": "相对路径不是依赖引用，不得计入 problems",
-      "evidence": { "rule": "src/check.mjs 的 outOfScope 分支", "toFillIn": "M2" }
+      "extractedAs": "import",
+      "mustNotProduceProblem": true,
+      "evidence": {
+        "rule": "src/check.mjs 的 outOfScope 分支（非已装依赖 → 不进 findings）",
+        "sourceLine": "src/h.mjs:1 `import local from \"./local.mjs\";`",
+        "why": "相对路径不是依赖引用。它**仍被 scan 抽出**（因此计入 totalPoints），但 check 层跳过不判——'抽出但不判'与'抽不出'必须可区分，所以本项断言 extractedAs=import 而不是不出现"
+      }
     },
     {
       "id": "c7-9-node-builtin",
@@ -113,10 +155,13 @@
       "line": 1,
       "kind": "import",
       "specifier": "node:fs",
-      "imported": ["readFileSync"],
-      "status": "OUT-OF-SCOPE",
-      "falsePositiveRisk": "node: 内置不是依赖引用",
-      "evidence": { "rule": "src/check.mjs 的 outOfScope 分支", "toFillIn": "M2" }
+      "extractedAs": "import",
+      "mustNotProduceProblem": true,
+      "evidence": {
+        "rule": "src/check.mjs 的 outOfScope 分支",
+        "sourceLine": "src/i.mjs:1 `import { readFileSync } from \"node:fs\";`",
+        "why": "node: 内置不是依赖引用。同 c7-8：抽得出、判不了，不得计入 problems"
+      }
     },
     {
       "id": "c7-10-prose-string",
@@ -124,10 +169,13 @@
       "line": 3,
       "kind": "string-literal",
       "specifier": "this is a chalk-like label",
-      "imported": [],
-      "status": "NOT-A-REFERENCE",
-      "falsePositiveRisk": "字符串兜底若不过滤会误判成引用",
-      "evidence": { "rule": "data/README.md §5.3 第 3 条（双条件抑制）", "toFillIn": "M2" }
+      "extractedAs": null,
+      "mustNotProduceProblem": true,
+      "evidence": {
+        "rule": "data/README.md §5.3 第 3 条（双条件抑制：形似包名 **且** 命中已装依赖）",
+        "sourceLine": "src/j.mjs:3 `const label = \"this is a chalk-like label\";`",
+        "why": "含空格 → 不形似包名 → 兜底不得计入。本项 extractedAs=null 断言它**连引用点都不该出现**（比'判绿'更强：兜底误报会先污染 totalPoints）"
+      }
     }
   ]
 }

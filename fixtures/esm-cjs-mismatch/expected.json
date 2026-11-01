@@ -6,13 +6,21 @@
   "verifies": "ESM-CJS-MISMATCH",
   "headline": "同代码不同包对照组：五个包全部 type=module，判定落在 exports.require 分支存在性 + 符号所在层",
   "source": {
-    "packages": ["chalk@6.0.1", "commander@15.0.0", "zod@4.6.7", "date-fns@4.4.0", "glob@14.0.3"],
+    "packages": [
+      "chalk@6.0.1",
+      "commander@15.0.0",
+      "zod@4.6.7",
+      "date-fns@4.4.0",
+      "glob@14.0.3"
+    ],
     "provenance": "data/packages/*.json + data/README.md §5.4.1 实测记录",
     "allTypeModule": true,
     "note": "五包 type 均为 module；仅看 type 会全判 MISMATCH（系统性假阳性）"
   },
   "expect": {
     "exitCode": 1,
+    "invocation": "check-only",
+    "invocationRationale": "本 case 验 check 层的 ESM-CJS-MISMATCH 反面判据。**不得**用 `--with-drift` 跑：drift 层会为 chalk/commander/date-fns/glob 产出 NO-BASELINE，把 gaps 抬到 4、退出码抬到 3——那是 drift 层『算不了』，不是 check 层的结论（data/README.md §5.1 的 NO-BASELINE 单条口径）",
     "summary": {
       "problems": 1,
       "gaps": 0,
@@ -29,7 +37,9 @@
       "line": 3,
       "kind": "require",
       "specifier": "chalk",
-      "imported": ["red"],
+      "imported": [
+        "red"
+      ],
       "status": "ESM-CJS-MISMATCH",
       "evidence": {
         "rule": "data/README.md §5.2 四条同时成立",
@@ -47,7 +57,9 @@
       "line": 3,
       "kind": "require",
       "specifier": "commander",
-      "imported": ["Command"],
+      "imported": [
+        "Command"
+      ],
       "status": "RESOLVED",
       "evidence": {
         "rule": "data/README.md §5.4.1 反面判据（无 require 分支但符号在命名空间上 → 不得判 MISMATCH）",
@@ -66,7 +78,9 @@
       "line": 3,
       "kind": "require",
       "specifier": "zod",
-      "imported": ["z"],
+      "imported": [
+        "z"
+      ],
       "status": "RESOLVED",
       "evidence": {
         "rule": "data/README.md §5.2 反面判据（有 require 分支 → 必须 RESOLVED）",
@@ -83,7 +97,9 @@
       "line": 3,
       "kind": "require",
       "specifier": "date-fns",
-      "imported": ["addDays"],
+      "imported": [
+        "addDays"
+      ],
       "status": "RESOLVED",
       "evidence": {
         "rule": "data/README.md §5.2 反面判据",
@@ -100,7 +116,9 @@
       "line": 3,
       "kind": "require",
       "specifier": "glob",
-      "imported": ["globSync"],
+      "imported": [
+        "globSync"
+      ],
       "status": "RESOLVED",
       "evidence": {
         "rule": "data/README.md §5.2 反面判据",

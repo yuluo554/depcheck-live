@@ -249,10 +249,11 @@ test("输出中不含绝对路径（隐私红线）", () => {
   }
 });
 
-test("selftest 未实现时退出 3（不假装成功）", () => {
+test("selftest 已落位（M4）：真跑自检并退出 0，不再是'尚未实现'的 3", () => {
   const r = run(["selftest"]);
-  assert.equal(r.code, 3);
-  assert.match(r.err, /尚未实现/);
+  assert.equal(r.code, 0, `selftest 应退出 0，实际 ${r.code}：${r.err}`);
+  assert.doesNotMatch(r.err, /尚未实现/, "M4 已落位，不得再报'尚未实现'");
+  assert.match(r.out, /条断言/);
 });
 
 test("drift 已落位（M3）：无基线时退出 3，不是 0（'没跑'与'跑了没问题'必须不同码）", () => {

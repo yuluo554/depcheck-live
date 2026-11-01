@@ -80,6 +80,35 @@ test("真值纪律 2：每个 point 都声明 status（不得只给结论靠猜�
   }
 });
 
+test("真值纪律 2b：negativePoints 只许出现在 C7，且每条都声明了可判据（M4）", () => {
+  // 为什么单列一条：`negativePoints` 里的 `OUT-OF-SCOPE` / `NOT-A-REFERENCE` **不是判定态**
+  // （src/contract.mjs 的 STATUS 只有五个），它们永远不会出现在 findings 里。M1 把这两个值
+  // 写成 `points[].status`，等于声明了一个没有任何东西能读到的真值（假门族 0）。
+  // M4 改成 `negativePoints` + `extractedAs` / `mustNotProduceProblem` 两条可断言的判据，
+  // 本测试保证这条纪律不会退回去。
+  for (const c of CASES) {
+    const parsed = JSON.parse(readFileSync(join(FIXTURES, c.dir, "expected.json"), "utf8"));
+    const negatives = parsed.negativePoints ?? [];
+    if (c.id !== "C7") {
+      assert.deepEqual(negatives, [], `fixtures/${c.dir}: 只有 C7 需要负向真值（其余 case 的 points 已能表达）`);
+      continue;
+    }
+    assert.ok(negatives.length > 0, "C7 必须有 negativePoints（它的第 8–10 条是反向断言）");
+    for (const n of negatives) {
+      assert.ok(n.id, `fixtures/${c.dir}: 有 negativePoint 缺 id`);
+      assert.ok(n.evidence, `fixtures/${c.dir} 的 ${n.id}: 缺 evidence（真值纪律：不得只给结论）`);
+      assert.ok(
+        "extractedAs" in n || n.mustNotProduceProblem === true,
+        `fixtures/${c.dir} 的 ${n.id}: 必须声明 extractedAs 或 mustNotProduceProblem（否则这条真值没人能断言）`,
+      );
+      // 判定态必须是五判定态之一 —— 否则它根本进不了 findings，写成 status 就是假门
+      if (n.status !== undefined) {
+        assert.fail(`fixtures/${c.dir} 的 ${n.id}: negativePoints 里不得写 status（"${n.status}" 不是判定态，进不了 findings）`);
+      }
+    }
+  }
+});
+
 test("每份 case 的判定态与它声明的 verifies 对得上（C1–C6）", () => {
   for (const c of CASES.filter((x) => x.status)) {
     const raw = readFileSync(join(FIXTURES, c.dir, "expected.json"), "utf8");

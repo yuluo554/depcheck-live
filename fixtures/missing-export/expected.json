@@ -6,12 +6,18 @@
   "verifies": "MISSING-EXPORT",
   "designNote": "M2 修正：M1 骨架把 MISSING-EXPORT 全部构造在 CJS 侧（require），但 chalk 无 require 分支时判定顺序里 ESM-CJS-MISMATCH 先于 MISSING-EXPORT，永远到不了 MISSING——那不是实现缺陷，是形态的固有结果。本 case 改为 ESM 视角构造 MISSING，CJS 侧只保留一条验证判定顺序的反例。",
   "source": {
-    "packages": ["chalk@6.0.1", "zod@4.6.7", "date-fns@4.4.0"],
+    "packages": [
+      "chalk@6.0.1",
+      "zod@4.6.7",
+      "date-fns@4.4.0"
+    ],
     "provenance": "data/packages/*.json",
     "note": "notARealExport 在任何真实包里都不存在；可独立复算：node -e \"import('chalk').then(m=>console.log('notARealExport' in m))\" → false"
   },
   "expect": {
     "exitCode": 1,
+    "invocation": "check-only",
+    "invocationRationale": "本 case 验 check 层的 MISSING-EXPORT / ESM-CJS-MISMATCH。**不得**用 `--with-drift` 跑：drift 层会为 chalk/date-fns 产出 NO-BASELINE（C2 只引这两个包），把 gaps 抬到 3——那是 drift 层『算不了』，不是 check 层的结论（data/README.md §5.1 的 NO-BASELINE 单条口径）",
     "summary": {
       "problems": 4,
       "gaps": 0,
@@ -28,14 +34,18 @@
       "line": 3,
       "kind": "import",
       "specifier": "chalk",
-      "imported": ["notARealExport"],
+      "imported": [
+        "notARealExport"
+      ],
       "status": "MISSING-EXPORT",
       "evidence": {
         "rule": "data/README.md §5 / plan/03 §4.3",
         "exportsSnippet": "\"exports\": { \"types\": \"./source/index.d.ts\", \"default\": \"./source/index.js\" }",
         "target": "./source/index.js",
         "availableSurface": "Chalk, chalkStderr, modifierNames, foregroundColorNames, backgroundColorNames, underlineColorNames, colorNames, modifiers, foregroundColors, backgroundColors, colors, supportsColor, supportsColorStderr, default（14 个，实测）",
-        "missing": ["notARealExport"],
+        "missing": [
+          "notARealExport"
+        ],
         "targetEvidence": "node_modules/chalk/source/index.js:262 `export default chalk;`；全文无 `export … notARealExport`",
         "why": "入口读得出（14 个具名导出），但 notARealExport 不在其中——这正是 MISSING-EXPORT 与 UNPARSEABLE 的分界：读得出且确实没有"
       }
@@ -46,13 +56,17 @@
       "line": 3,
       "kind": "import",
       "specifier": "zod",
-      "imported": ["notARealExport"],
+      "imported": [
+        "notARealExport"
+      ],
       "status": "MISSING-EXPORT",
       "evidence": {
         "rule": "data/README.md §5",
         "target": "./index.js",
         "availableSurface": "z, default（2 个，实测）",
-        "missing": ["notARealExport"],
+        "missing": [
+          "notARealExport"
+        ],
         "targetEvidence": "node_modules/zod/index.js:7 `export { z, z as default };`（另有 `export *` 转发 v4/classic/external.js）",
         "why": "import 视角取 ./index.js；导出集是 z 与 default，notARealExport 不在其中"
       }
@@ -63,13 +77,17 @@
       "line": 3,
       "kind": "import",
       "specifier": "date-fns",
-      "imported": ["notARealExport"],
+      "imported": [
+        "notARealExport"
+      ],
       "status": "MISSING-EXPORT",
       "evidence": {
         "rule": "data/README.md §5",
         "target": "./index.js",
         "availableSurface": "245 行 export * 展开后 251 个名字（含 addDays / add / addMonths …），无 notARealExport",
-        "missing": ["notARealExport"],
+        "missing": [
+          "notARealExport"
+        ],
         "targetEvidence": "node_modules/date-fns/index.js 全文 245 条 `export * from \"./x.js\";`；代表性条目 ./addDays.js:49 `export function addDays(...)`",
         "why": "本条同时钉住'桶文件递归'：若不递归，导出集会读成空，判定就退化成'读不出'而不是'读出了但没有'"
       }
@@ -80,7 +98,9 @@
       "line": 4,
       "kind": "require",
       "specifier": "chalk",
-      "imported": ["red"],
+      "imported": [
+        "red"
+      ],
       "status": "ESM-CJS-MISMATCH",
       "whyNotMissingExport": "red 确实存在于 chalk 的 .default 下（source/index.d.ts:253 `readonly red: this;`），但其 CJS 命名空间上没有 → 判定顺序 §4.4 里 MISMATCH 先于 MISSING-EXPORT",
       "evidence": {

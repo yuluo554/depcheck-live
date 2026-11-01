@@ -71,6 +71,12 @@ depcheck-live check .
 depcheck-live check <path>            # 人读摘要
 depcheck-live check <path> --json     # 机读
 depcheck-live check <path> --with-drift
+depcheck-live drift <path>            # 版本行为漂移（需离线基线）
+depcheck-live snapshot <path>         # 只输出依赖面快照
+depcheck-live scan <path>             # 只输出引用点
+depcheck-live bench                   # 基准：C1–C6 逐条 + 逐项对账
+depcheck-live bench --clean           # 干净工程零误报基准（C7）
+depcheck-live selftest                # 自检：现场造最小工程断言退出码 0/1/3/4
 depcheck-live --version
 ```
 
@@ -81,7 +87,49 @@ depcheck-live --version
 而 `chalk` / `commander` 没有，行为完全不同。只看 `type` 会把前三个全判成 MISMATCH——
 **系统性假阳性**。判据原文见 `data/README.md` §5.2。
 
-## 开发
+## 基准指标
+
+以下是本工具在真机上的实跑结果，**可直接复算**（`bench` 面对的是真实 `node_modules`，
+不是 mock）。两条命令各自输出**两种粒度**，它们量的是不同的东西，**不可混读**：
+
+```bash
+node bin/depcheck-live.mjs bench          # C1–C6：五判定态 + drift 的对照语料
+node bin/depcheck-live.mjs bench --clean  # C7：干净工程零误报（反向断言）
+node bin/depcheck-live.mjs selftest       # 退出码语义 0/1/3/4 自检
+```
+
+### 逐条级（引用点对账）
+
+**每个引用点**的判定结果与语料真值逐条比对——这是"判得对不对"的直接证据。
+
+| 命令 | 语料 | 引用点 | 对账通过 |
+|---|---:|---:|---:|
+| `bench` | 6 份（C1–C6） | 28 | **28 / 28** |
+| `bench --clean` | 1 份（C7） | 7 | **7 / 7** |
+
+### 计数级（语料级断言）
+
+**每份语料**的退出码、`summary`、`byStatus`、负向断言逐项比对——这是"整份语料是否可信"的证据。
+它与逐条级不是同一个数：一条语料的全绿可能只由 5 条引用点对账构成，也可能由 14 条断言的组合构成。
+
+| 命令 | 语料级断言 | 通过 |
+|---|---:|---:|
+| `bench` | 49 条（6 份语料） | **49 / 49** |
+| `bench --clean` | 14 条（1 份语料） | **14 / 14** |
+
+### 自检（退出码语义）
+
+`selftest` 在**本机现场造最小工程**（不读本仓路径、不联网），断言四条退出码语义各自被真的诱发：
+
+| 断言 | 覆盖 |
+|---|---:|
+| `selftest` | **8 / 8**，覆盖退出码 `0` / `1` / `3` / `4` |
+
+其中 `3` 有**两个独立触发源**（依赖缺失、基准缺失），各一条断言；`2` 保留不用，由一条断言钉住。
+
+> **口径提醒**：「28 / 28 引用点对账通过」是**逐条级**；「6 份语料全绿」是**计数级**。
+> 前者不蕴含后者（全扫到不等于每份语料自洽），后者也不蕴含前者（语料级断言可以过而某条引用点判错）。
+> 数值的唯一定义见 `data/README.md` §5；本节的数字随语料增补而变，**不是**里程碑状态。
 
 ```bash
 npm test                              # 单元/契约测试（node --test，逐文件）
