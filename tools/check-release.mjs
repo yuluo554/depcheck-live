@@ -24,7 +24,8 @@
 //    `--online` 拿不到 `gh` / 网络 / 远端时不许回 0——那会把"这一层没跑"写成"跑了没问题"。
 
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -269,23 +270,34 @@ function checkOnline(version, facts) {
     return;
   }
 
-  const tmp = join(ROOT, "tmp", `release-download-${process.pid}`);
-  const dl = spawnSync("gh", ["release", "download", tag, "-p", want, "-D", tmp, "--clobber"], { cwd: ROOT, encoding: "utf8" });
-  if (dl.error || dl.status !== 0) {
-    add("RELEASE.ONLINE_ASSET", false, `回取附件失败（${dl.error?.message ?? (dl.stderr ?? "").trim().split("\n")[0]}）`, "unknown");
-    return;
+  // 回取目录用**系统临时目录**并保证清理（本仓口径：临时工程一律 mkdtempSync(tmpdir())；
+  // `/tmp` 在 Git Bash + Node 上不可用，所以不能写死 "/tmp"）。
+  // ⚠️ 首版落在仓库内 `tmp/release-download-<pid>/`，**从不删除**——每跑一次 `--online`
+  //    就在工作树里留一份 1.2 MB 的 zip 副本（实测跑几次后 `tmp/` 下积了 14 个目录）。
+  //    判据门不该往被测仓库里写东西；`tmp/` 虽已 gitignore，但那只是让泄漏看不见。
+  const dlDir = mkdtempSync(join(tmpdir(), "depcheck-release-"));
+  try {
+    const dl = spawnSync("gh", ["release", "download", tag, "-p", want, "-D", dlDir, "--clobber"], { cwd: ROOT, encoding: "utf8" });
+    if (dl.error || dl.status !== 0) {
+      add("RELEASE.ONLINE_ASSET", false, `回取附件失败（${dl.error?.message ?? (dl.stderr ?? "").trim().split("\n")[0]}）`, "unknown");
+      return;
+    }
+    const back = join(dlDir, want);
+    if (!existsSync(back)) {
+      add("RELEASE.ONLINE_ASSET", false, `回取后找不到 ${want}（gh 退出 0 但文件不在）`);
+      return;
+    }
+    const actual = sha256Of(back);
+    add(
+      "RELEASE.ONLINE_ASSET",
+      actual === recorded,
+      actual === recorded
+        ? `回取 ${want} 的 sha256 与留档一致（${actual.slice(0, 12)}…）`
+        : `回取 sha256 不符：远端 ${actual} / 留档 ${recorded}`,
+    );
+  } finally {
+    rmSync(dlDir, { recursive: true, force: true });
   }
-  const back = join(tmp, want);
-  if (!existsSync(back)) {
-    add("RELEASE.ONLINE_ASSET", false, `回取后找不到 ${want}（gh 退出 0 但文件不在）`);
-    return;
-  }
-  const actual = sha256Of(back);
-  add(
-    "RELEASE.ONLINE_ASSET",
-    actual === recorded,
-    actual === recorded ? `回取 ${want} 的 sha256 与留档一致（${actual.slice(0, 12)}…）` : `回取 sha256 不符：远端 ${actual} / 留档 ${recorded}`,
-  );
 }
 
 function finish(mode) {

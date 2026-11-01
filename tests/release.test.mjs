@@ -12,7 +12,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -205,4 +205,23 @@ test("未知参数回 2（不许静默忽略——静默会让『我以为它验
     encoding: "utf8",
   });
   assert.equal(r.status, 2);
+});
+
+test("★ 门不许往被测仓库里写东西：跑完 --online 后仓库的 tmp/ 不多出任何条目", () => {
+  // 实测缺陷（M6 收尾）：回取目录原落在仓库内 `tmp/release-download-<pid>/` **且从不删除**，
+  // 每跑一次 `--online` 就在工作树里留一份 1.2 MB 的 zip 副本（实测积了 14 个目录）。
+  // `tmp/` 已 gitignore，所以这条泄漏在 git status 上**看不见**——正是需要机器判据的那类。
+  const tmpDir = join(ROOT, "tmp");
+  const before = existsSync(tmpDir) ? new Set(readdirSync(tmpDir)) : new Set();
+  const r = spawnSync(process.execPath, [join(ROOT, "tools", "check-release.mjs"), "--online"], {
+    cwd: ROOT,
+    encoding: "utf8",
+  });
+  // 环境不足时（无 gh / 无网络）不产生回取，这条测试就退化成"没东西要漏"——显式跳过而非假装通过
+  if (r.status === 3 || /算不了/.test(r.stdout)) {
+    return; // 由上面那条"算不了走 3"的测试负责，这条不重复断言
+  }
+  const after = existsSync(tmpDir) ? new Set(readdirSync(tmpDir)) : new Set();
+  const leaked = [...after].filter((x) => !before.has(x));
+  assert.deepEqual(leaked, [], `--online 在仓库 tmp/ 里留下了残留（临时目录必须 mkdtempSync(tmpdir()) + finally 清理）：${leaked.join(", ")}`);
 });

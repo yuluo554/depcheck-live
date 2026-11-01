@@ -30,16 +30,31 @@ CI 也不会报。
 
 ## 安装与运行
 
-要求 **Node ≥ 20**（开发与实测用 v24.15.0）。**零第三方依赖**。
+要求 **Node ≥ 20**（开发与实测用 v24.15.0）。**零第三方依赖**——本工具自身不 `npm install`。
+
+它判定的是**你那个工程**的引用点，所以要在**装过依赖的工程**里跑：
 
 ```bash
-# 从仓库直接跑（无需安装）
-node bin/depcheck-live.mjs check .
+# 在你自己的工程里（必须先有 node_modules）
+node /path/to/depcheck-live/bin/depcheck-live.mjs check .
 
 # 或链接成本地命令
 npm link
 depcheck-live check .
 ```
+
+> **在本仓库自己的裸 clone 里跑 `check .` 会回退出码 `3`**（`NO_NODE_MODULES`）：
+> 本仓把 `node_modules/` gitignore 了，工具没有可比的依赖面 —— 那是**"算不了"，不是"没问题"**。
+> 裸 clone 里能跑通的是不需要依赖面那几样：
+>
+> ```bash
+> node bin/depcheck-live.mjs --version    # depcheck-live 0.1.0
+> node bin/depcheck-live.mjs selftest     # 8/8（现场造最小工程，不依赖本仓依赖）
+> npm test                                # 222 tests / 192 pass / 30 skipped（skip = 需要真实五包）
+> ```
+>
+> 要跑 `bench` / `bench --clean` 或对本仓自检，先装五包（`--no-save` 保住零依赖承诺）：
+> `npm i --no-save chalk@6 zod@4 date-fns@4 commander@15 glob@14`
 
 ## 五个判定态
 
