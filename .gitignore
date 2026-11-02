@@ -65,6 +65,9 @@ _private/
 .depcheck-live/
 tmp/
 *.tmp
+# 迭代交接物（诊断/执行对话落盘）：只留本地、永不入库，内容天然含本机绝对路径。
+# 与 tools/check-desensitized.mjs 的 SKIP_DIRS 同笔配对（gate-selfcheck 逐条对账）。
+update/
 # 发布附件（M6 口径 A：整个 tag 树的 zip）。产物不入库——它由 tag 树生成，
 # 入库会让"附件"与"tag 树"成为两份可能漂移的副本。sha256 记在 plan/RELEASE-M6.md。
 dist-release/

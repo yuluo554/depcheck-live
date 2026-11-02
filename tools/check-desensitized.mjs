@@ -52,6 +52,9 @@ const SKIP_DIRS = new Set([
   "build", "_private", ".depcheck-live", ".pytest_cache", "coverage", "_scratch", ".venv-readme",
   // 编辑器 / 系统 / 工具本地的状态目录（`.gitignore` 里声明过的，这里必须有对应项）
   ".vscode", ".idea", ".mimosa",
+  // 迭代交接物（update/，与 `.gitignore` 同笔配对）：只留本地、永不入库，
+  // 内容天然含本机绝对路径（诊断报告/执行记录的工作语言就是路径本身）。
+  "update",
   // `.gitignore` 的 Python 模板残留段：本仓不产出这些路径，但**留着对应项**——
   // 万一有人在本仓跑 pytest/venv，这些目录会出现在磁盘上，届时必须已经在外。
   // `share/python-wheels/` 按 basename 取 `python-wheels`（门的匹配口径是目录名）。
