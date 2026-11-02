@@ -44,7 +44,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         # 本机只有 v24；跨版本行为只能靠这条矩阵证明（HANDOFF-M0 §5 U2）
-        node: [20, 22, 24]
+        node: [20, 22, 24, 26]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
