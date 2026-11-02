@@ -223,6 +223,16 @@ push 与 tag 推送均成功。`gh` 命令走 API 链路，不受影响。
 > 下一棒若换机器复现 push 失败，先分别测 `curl https://github.com/` 与 `ssh -T git@github.com`：
 > 一个不通一个通 → 换 SSH 远端即可，不必改仓库内容。
 
+### 2.9 v0.1.1 上传与回取（`--online` 档闭环，2026-11-03）
+
+| 项 | 值 |
+|---|---|
+| Release URL | `https://github.com/yuluo554/depcheck-live/releases/tag/v0.1.1`（非 draft，1 个附件） |
+| 附件 | `depcheck-live-0.1.1.zip`（1 248 763 字节，state `uploaded`） |
+| `--online` | **全绿（退出码 0，9 条判据全 PASS）**：`RELEASE.ONLINE` / `ONLINE_ASSET`（门在 `tmp/` 独立回取并重算 sha256 = `62628d657618…`，与事实块一致）/ `LOCAL_COPY` |
+
+Release 正文含五部分：变更摘要 / 依据版本（无规则集，`src/` 零改动）/ 历史结果无需重跑 / 校验和 / 已知问题（tag 树 sha 留空 = 反自指；裸 clone `check .` 回 3 = 设计）。
+
 ## 三、覆盖对账
 
 逐条对照 `plan/05` §2 的 M6 DoD 五项。**三态取其一**：`实现`（本仓有实物且已实跑）/
