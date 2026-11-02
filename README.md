@@ -50,7 +50,7 @@ depcheck-live check .
 > 裸 clone 里能跑通的是不需要依赖面那几样：
 >
 > ```bash
-> node bin/depcheck-live.mjs --version    # depcheck-live 0.1.0
+> node bin/depcheck-live.mjs --version    # depcheck-live 0.1.1
 > node bin/depcheck-live.mjs selftest     # 8/8（现场造最小工程，不依赖本仓依赖）
 > npm test                                # 223 tests / 193 pass / 30 skipped（skip = 需要真实五包）
 > ```

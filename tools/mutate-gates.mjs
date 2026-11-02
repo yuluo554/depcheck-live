@@ -431,28 +431,28 @@ id: "H1",
     name: "把留档事实块的 version 改成另一个号（版本三处不一致）",
     // 靶子改的是**事实块里的那一行**（判据读的正是它），不是正文别的 0.1.0 文本，
     // 也不是 package.json（那条由 R4 管）。表格行按整行匹配，贴合门"按整行锚定"的读法。
-    apply: (cwd) => mutateFile(cwd, RELEASE_DOC, "| version | 0.1.0 |", "| version | 0.2.0 |"),
+    apply: (cwd) => mutateFile(cwd, RELEASE_DOC, "| version | 0.1.1 |", "| version | 0.2.0 |"),
   },
   {
     id: "R3",
     gate: RELEASE,
     judge: "RELEASE.ASSET",
     name: "附件名改成不含版本号的形态（发布后从名字认不出是哪个版本）",
-    apply: (cwd) => mutateFile(cwd, RELEASE_DOC, "| attachment | depcheck-live-0.1.0.zip |", "| attachment | depcheck-live.zip |"),
+    apply: (cwd) => mutateFile(cwd, RELEASE_DOC, "| attachment | depcheck-live-0.1.1.zip |", "| attachment | depcheck-live.zip |"),
   },
   {
     id: "R4",
     gate: RELEASE,
     judge: "RELEASE.VERSION",
     name: "只改 package.json 的 version（留档没跟 → 三处不一致必须红）",
-    apply: (cwd) => mutateFile(cwd, "package.json", '"version": "0.1.0"', '"version": "0.1.1"'),
+    apply: (cwd) => mutateFile(cwd, "package.json", '"version": "0.1.1"', '"version": "0.1.2"'),
   },
   {
     id: "R5",
     gate: RELEASE,
     judge: "RELEASE.FACTS",
     name: "事实块里塞一个重复字段（值互相覆盖却只报最后一个 → 假绿）",
-    apply: (cwd) => mutateFile(cwd, RELEASE_DOC, "| attachment | depcheck-live-0.1.0.zip |", "| attachment | depcheck-live-0.1.0.zip |\n| attachment | depcheck-live-0.9.9.zip |"),
+    apply: (cwd) => mutateFile(cwd, RELEASE_DOC, "| attachment | depcheck-live-0.1.1.zip |", "| attachment | depcheck-live-0.1.1.zip |\n| attachment | depcheck-live-0.9.9.zip |"),
   },
   {
     id: "R6",

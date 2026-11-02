@@ -11,10 +11,10 @@
 
 | 字段 | 值 |
 |---|---|
-| version | 0.1.0 |
-| tag | v0.1.0 |
-| attachment | depcheck-live-0.1.0.zip |
-| attachmentSha256 | 44f00d5a0d9f2270003ea23b0a5f7cb727ca6f05bffaa1d8f8e1728ef47d8732 |
+| version | 0.1.1 |
+| tag | v0.1.1 |
+| attachment | depcheck-live-0.1.1.zip |
+| attachmentSha256 |  |
 
 <!-- RELEASE-FACTS:END -->
 

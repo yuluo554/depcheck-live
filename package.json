@@ -1,6 +1,6 @@
 {
   "name": "depcheck-live",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "判断源码里每个对已装依赖的引用点，在「这份 node_modules」下是否真的可解析。纯静态、零联网、不执行被测代码。",
   "type": "module",
   "bin": {
