@@ -14,7 +14,7 @@
 | version | 0.1.1 |
 | tag | v0.1.1 |
 | attachment | depcheck-live-0.1.1.zip |
-| attachmentSha256 |  |
+| attachmentSha256 | 62628d657618cf08a0b786b47115c9897c91485d7e1aa4aeaf189248616f4441 |
 
 <!-- RELEASE-FACTS:END -->
 
@@ -252,3 +252,22 @@ push 与 tag 推送均成功。`gh` 命令走 API 链路，不受影响。
 
 环境不足（`gh` 不在 / 无 origin / 读不到 Release）时回**退出码 3**，不回 0
 ——与 `data/README.md` §5.1 同一条纪律：**"算不了"与"没事"必须落在不同退出码**。
+
+### 2.8 v0.1.1 补丁版发布（2026-11-03，二次迭代落地）
+
+诊断（`update/00-诊断报告.md`）判无 P0/P1；本轮改动全在交付面之外：CI actions v4→v7 +
+concurrency + 矩阵补 Node 26 腿；`update/` 交接物目录同笔配对（`.gitignore`+`SKIP_DIRS`，
+脱敏门扫描面回到留档基线 127 文件 0 命中）；README 补 Node 20 EOL 披露（floor 不收窄）。
+**判定语义（`src/`、五判定态、退出码 0/1/3/4）零改动，历史结果无需重跑。**
+
+| 项 | 值 |
+|---|---|
+| tag | `v0.1.1`（annotated，指向提交 `f53a660`；打 tag 前 `--pre-tag` 实测全绿） |
+| 附件（本地） | `dist-release/depcheck-live-0.1.1.zip`（1 248 763 字节，130 个文件，与 v0.1.0 同构） |
+| 附件 sha256 | `62628d657618cf08a0b786b47115c9897c91485d7e1aa4aeaf189248616f4441`（即事实块回填值） |
+| 升版提交 CI | run `41487040535`：9 job 全绿（门 ×1 + 测试 ×8 = node 20/22/24/26 × ubuntu/windows，26 腿为本次新增） |
+
+生成方式：`git archive --format=zip --prefix=depcheck-live-0.1.1/ -o … v0.1.1`（§2.1 同配方）。
+顺序照旧：打 tag → archive → 算 sha256 → 本节追加 → 上传附件；**tag 树里事实块 sha256 为空**（反自指）。
+Node20 弃用注解自 actions v7 起**清零**（run `41484937807` 起 ANNOTATIONS 仅剩
+ubuntu-latest→Ubuntu 26 迁移预告，属既有信号）。`--pre-tag` 在 tag 推送后按 §四 设计必红，不再当回归修。
